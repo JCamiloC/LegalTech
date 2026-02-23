@@ -74,10 +74,10 @@ export default async function CasoDetallePage({ params, searchParams }: CasoDeta
       : "Siguiente paso: generar y subir documento definitivo.";
 
   return (
-    <main className="mx-auto flex min-h-screen w-full max-w-6xl flex-col gap-6 px-6 py-10">
+    <main className="mx-auto flex min-h-screen w-full max-w-6xl flex-col gap-6 px-4 py-8 sm:px-6 sm:py-10">
       <FeedbackToast message={okMessage} tone="success" />
       <FeedbackToast message={errorMessage} tone="error" />
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <p className="text-xs uppercase tracking-wide text-slate-500">Detalle del caso</p>
           <h1 className="text-2xl font-semibold text-slate-900">Radicado {caseRecord.radicado}</h1>
@@ -85,7 +85,7 @@ export default async function CasoDetallePage({ params, searchParams }: CasoDeta
             {caseRecord.demandante_nombre} vs. {caseRecord.demandado_nombre}
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <Link href="/casos" className="rounded-lg border border-slate-300 px-4 py-2 text-sm">
             Volver a casos
           </Link>
@@ -155,13 +155,11 @@ export default async function CasoDetallePage({ params, searchParams }: CasoDeta
           <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Decisiones</h2>
           <p className="mt-2 text-sm text-slate-700">Sugerida: {caseRecord.decision_sugerida ?? "Sin evaluar"}</p>
           <p className="text-sm text-slate-700">Final: {caseRecord.decision_final ?? "Pendiente"}</p>
-          <p className="text-sm text-slate-700">
-            Documento: {latestDecision?.documento_url ? latestDecision.documento_url : "No generado"}
-          </p>
+          <p className="text-sm text-slate-700">Documento: vista HTML con plantilla institucional</p>
           {latestDecision?.documento_url ? (
             <form action={openGeneratedDocument} className="mt-2">
               <button type="submit" className="rounded-md border border-slate-300 px-3 py-1 text-xs">
-                Abrir documento generado
+                Abrir documento histórico (storage)
               </button>
             </form>
           ) : null}
@@ -340,14 +338,14 @@ export default async function CasoDetallePage({ params, searchParams }: CasoDeta
                 className="rounded-lg border border-slate-300 px-4 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-50"
                 title={
                   isDecided
-                    ? "Genera y sube el documento de decisión"
+                    ? "Genera la vista final en HTML usando la plantilla institucional"
                     : "Disponible cuando el caso esté en estado decidido"
                 }
               >
-                Generar y subir documento
+                Generar vista final (HTML)
               </button>
             </form>
-            <Link href={`/documentos/preview?caseId=${id}`} className="rounded-lg border border-slate-300 px-4 py-2 text-sm">
+            <Link href={`/documentos/preview?caseId=${id}&source=word`} className="rounded-lg border border-slate-300 px-4 py-2 text-sm">
               Ver preview
             </Link>
           </div>

@@ -2,7 +2,11 @@ import Link from "next/link";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { CaseRepository, CaseService } from "@/modules/cases";
 import { DecisionRepository, DecisionService } from "@/modules/decisions";
-import { buildDocumentPreview, TemplateRepository } from "@/modules/documents";
+import {
+  buildDocumentPreview,
+  buildInstitutionalTemplateHtml,
+  TemplateRepository,
+} from "@/modules/documents";
 
 const DEFAULT_TEMPLATE = `<h1>{{despacho}}</h1>
 <p>Radicado: {{radicado}}</p>
@@ -19,6 +23,8 @@ export default async function DocumentPreviewPage({ searchParams }: DocumentPrev
   const resolvedSearchParams = (await searchParams) ?? {};
   const caseIdParam = resolvedSearchParams.caseId;
   const caseId = Array.isArray(caseIdParam) ? caseIdParam[0] : caseIdParam;
+  const sourceParam = resolvedSearchParams.source;
+  const source = Array.isArray(sourceParam) ? sourceParam[0] : sourceParam;
 
   if (!caseId) {
     const fallback = buildDocumentPreview(DEFAULT_TEMPLATE, {
@@ -61,25 +67,40 @@ export default async function DocumentPreviewPage({ searchParams }: DocumentPrev
     );
   }
 
+  const institutionalPreview =
+    source === "word"
+      ? await buildInstitutionalTemplateHtml({
+          radicado: caseRecord.radicado,
+          demandante: caseRecord.demandante_nombre,
+          demandado: caseRecord.demandado_nombre,
+          tipoProceso: caseRecord.tipo_proceso,
+          decision: decision.tipo_decision,
+          fundamento: decision.fundamento_juridico,
+          cuantia: caseRecord.cuantia,
+        })
+      : null;
+
   const template = await templateRepository.findActiveByDecision(decision.tipo_decision);
-  const preview = buildDocumentPreview(template?.contenido_html ?? DEFAULT_TEMPLATE, {
-    radicado: caseRecord.radicado,
-    despacho: caseRecord.despacho ?? "Despacho por definir",
-    demandante: caseRecord.demandante_nombre,
-    demandado: caseRecord.demandado_nombre,
-    fundamento: decision.fundamento_juridico,
-    decision: decision.tipo_decision,
-  });
+  const preview =
+    institutionalPreview ??
+    buildDocumentPreview(template?.contenido_html ?? DEFAULT_TEMPLATE, {
+      radicado: caseRecord.radicado,
+      despacho: caseRecord.despacho ?? "Despacho por definir",
+      demandante: caseRecord.demandante_nombre,
+      demandado: caseRecord.demandado_nombre,
+      fundamento: decision.fundamento_juridico,
+      decision: decision.tipo_decision,
+    });
 
   return (
     <main className="mx-auto min-h-screen w-full max-w-4xl px-6 py-10">
-      <div className="mb-4 flex items-center justify-between">
+      <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="text-xl font-semibold text-slate-900">Preview del documento</h1>
         <Link href={`/casos/${caseId}`} className="text-sm underline">
           Volver al caso
         </Link>
       </div>
-      <div className="prose prose-sm max-w-none rounded-xl border border-slate-200 bg-white p-5" dangerouslySetInnerHTML={{ __html: preview }} />
+      <div className="prose prose-sm max-w-none break-words rounded-xl border border-slate-200 bg-white p-5" dangerouslySetInnerHTML={{ __html: preview }} />
     </main>
   );
 }

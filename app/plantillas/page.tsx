@@ -33,11 +33,11 @@ export default async function PlantillasPage({ searchParams }: PlantillasPagePro
   const templates = await service.listTemplates();
 
   return (
-    <main className="mx-auto flex min-h-screen w-full max-w-6xl flex-col gap-6 px-6 py-10">
+    <main className="mx-auto flex min-h-screen w-full max-w-6xl flex-col gap-6 px-4 py-8 sm:px-6 sm:py-10">
       <FeedbackToast message={okMessage} tone="success" />
       <FeedbackToast message={errorMessage} tone="error" />
 
-      <header className="flex items-center justify-between">
+      <header className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-semibold text-slate-900">Plantillas de documento</h1>
           <p className="mt-1 text-sm text-slate-600">Administra plantillas HTML por tipo de decisión.</p>

@@ -18,6 +18,10 @@ export interface DecisionSuggestion {
   explicacion: {
     resumen: string;
     reglasEvaluadas: RuleEvaluationResult[];
+    hechosRelevantes: string[];
+    analisis: string[];
+    conclusion: string;
+    argumentoEstandar: string;
   };
 }
 
@@ -28,4 +32,7 @@ export interface RuleEvaluationResult {
   prioridad: number;
   resultado: string;
   fundamento: string;
+  score: number;
+  complejidad: number;
+  razones: string[];
 }

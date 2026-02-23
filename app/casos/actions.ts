@@ -14,10 +14,7 @@ import { CaseService } from "@/modules/cases/case.service";
 import { AuditRepository, AuditService } from "@/modules/audit";
 import { DecisionRepository, DecisionService } from "@/modules/decisions";
 import {
-  createDocxBufferFromTemplate,
   getSignedDecisionDocumentUrl,
-  TemplateRepository,
-  uploadDecisionDocument,
 } from "@/modules/documents";
 import { evaluateCase } from "@/modules/rules";
 import type { DecisionType } from "@/types";
@@ -37,18 +34,156 @@ function assertDecisionType(value: string): DecisionType {
   return "auto_inadmisorio";
 }
 
-function getDefaultTemplate() {
-  return `
-    <h1>{{despacho}}</h1>
-    <p><strong>Radicado:</strong> {{radicado}}</p>
-    <p><strong>Demandante:</strong> {{demandante}}</p>
-    <p><strong>Demandado:</strong> {{demandado}}</p>
-    <p><strong>Decisión:</strong> {{decision}}</p>
-    <p><strong>Fundamento:</strong> {{fundamento}}</p>
-  `;
+function normalizeDocumentText(content: string): string {
+  return content.replace(/\r/g, "\n").replace(/\t/g, " ").replace(/\u00a0/g, " ").replace(/ +/g, " ");
+}
+
+function findFirstMatch(text: string, patterns: RegExp[]): string | null {
+  for (const pattern of patterns) {
+    const match = text.match(pattern);
+    if (match?.[1]) {
+      const value = match[1].trim();
+      if (value.length > 0) {
+        return value;
+      }
+    }
+  }
+
+  return null;
+}
+
+function parseCuantia(rawValue: string | null): string | null {
+  if (!rawValue) {
+    return null;
+  }
+
+  const numeric = rawValue.replace(/[^\d,\.]/g, "").replace(/\./g, "").replace(/,/g, ".").trim();
+
+  if (!numeric) {
+    return null;
+  }
+
+  const parsed = Number(numeric);
+  if (Number.isNaN(parsed)) {
+    return null;
+  }
+
+  return String(parsed);
+}
+
+function inferTipoProceso(text: string, extracted: string | null): string | null {
+  if (extracted) {
+    return extracted;
+  }
+
+  const lower = text.toLowerCase();
+
+  if (lower.includes("proceso ejecutivo")) return "Ejecutivo";
+  if (lower.includes("demanda ejecutiva para la efectividad de la garant") ) return "Ejecutivo con garantía real";
+  if (lower.includes("proceso verbal")) return "Verbal";
+  if (lower.includes("proceso monitorio")) return "Monitorio";
+  if (lower.includes("proceso ordinario")) return "Ordinario";
+
+  return null;
+}
+
+async function extractTextFromPdfFile(file: File): Promise<string> {
+  const arrayBuffer = await file.arrayBuffer();
+  const pdfModule = await import("pdf-parse/lib/pdf-parse.js");
+  const pdfParse = (pdfModule.default ?? pdfModule) as (data: Buffer) => Promise<{ text?: string }>;
+  const result = await pdfParse(Buffer.from(arrayBuffer));
+  return normalizeDocumentText(result.text ?? "");
+}
+
+export async function parseDemandDocumentAction(formData: FormData) {
+  let targetPath = "/casos/nuevo";
+
+  try {
+    const file = formData.get("demanda_file");
+
+    if (!(file instanceof File)) {
+      throw new Error("Debe adjuntar un archivo PDF de la demanda");
+    }
+
+    const isPdf = file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
+
+    if (!isPdf) {
+      throw new Error("Formato no soportado. Use archivo .pdf");
+    }
+
+    const text = await extractTextFromPdfFile(file);
+
+    if (!text.trim() || text.trim().length < 80) {
+      throw new Error(
+        "No se pudo extraer texto suficiente del PDF. Si es un escaneo (imagen), el siguiente paso es activar OCR avanzado de imagen."
+      );
+    }
+
+    const radicado = findFirstMatch(text, [
+      /radicado\s*(?:no\.?|n\.?|número|num\.?|#)?\s*[:\-]?\s*([A-Z0-9\-\.\/]{6,})/i,
+      /referencia\s*[:\-]\s*([A-Z0-9\-\.\/]{6,})/i,
+    ]);
+
+    const demandante = findFirstMatch(text, [
+      /dte\s*[:\-]\s*([^\n]{3,140})/i,
+      /demandante(?:s)?\s*[:\-]\s*([^\n]{3,120})/i,
+      /actor(?:a)?\s*[:\-]\s*([^\n]{3,120})/i,
+    ]);
+
+    const demandado = findFirstMatch(text, [
+      /ddo\s*[:\-]\s*([^\n]{3,140})/i,
+      /demandado(?:s)?\s*[:\-]\s*([^\n]{3,120})/i,
+      /convocado(?:s)?\s*[:\-]\s*([^\n]{3,120})/i,
+    ]);
+
+    const tipoProcesoRaw = findFirstMatch(text, [
+      /ref\s*[:\-]\s*([^\n]{3,180})/i,
+      /tipo\s+de\s+proceso\s*[:\-]\s*([^\n]{3,100})/i,
+      /proceso\s*[:\-]\s*([^\n]{3,100})/i,
+    ]);
+
+    const subtipoProceso = findFirstMatch(text, [/subtipo\s+de\s+proceso\s*[:\-]\s*([^\n]{3,100})/i]);
+    const cuantiaRaw = findFirstMatch(text, [
+      /cuant[ií]a\s*[:\-]?\s*\$?\s*([^\n]{1,40})/i,
+      /pretensiones\s*[:\-]?\s*\$?\s*([^\n]{1,40})/i,
+    ]);
+    const competencia = findFirstMatch(text, [
+      /competencia\s+territorial\s*[:\-]\s*([^\n]{3,120})/i,
+      /competencia\s*[:\-]\s*([^\n]{3,120})/i,
+    ]);
+    const despacho = findFirstMatch(text, [
+      /juzgado\s*[:\-]\s*([^\n]{3,160})/i,
+      /despacho\s*[:\-]\s*([^\n]{3,160})/i,
+    ]);
+
+    const query = new URLSearchParams();
+    query.set("ok", "documento_importado");
+
+    if (radicado) query.set("radicado", radicado);
+    if (demandante) query.set("demandante_nombre", demandante);
+    if (demandado) query.set("demandado_nombre", demandado);
+
+    const tipoProceso = inferTipoProceso(text, tipoProcesoRaw);
+    if (tipoProceso) query.set("tipo_proceso", tipoProceso);
+    if (subtipoProceso) query.set("subtipo_proceso", subtipoProceso);
+
+    const cuantia = parseCuantia(cuantiaRaw);
+    if (cuantia) query.set("cuantia", cuantia);
+    if (competencia) query.set("competencia_territorial", competencia);
+    if (despacho) query.set("despacho", despacho);
+
+    targetPath = `/casos/nuevo?${query.toString()}`;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "No fue posible importar el documento";
+    targetPath = `/casos/nuevo?error=${encodeURIComponent(message)}`;
+  }
+
+  redirect(targetPath);
 }
 
 export async function createCaseAction(formData: FormData) {
+  let targetPath = "/casos/nuevo";
+
   try {
     const supabase = await createSupabaseServerClient();
     const caseService = new CaseService(new CaseRepository(supabase));
@@ -78,14 +213,18 @@ export async function createCaseAction(formData: FormData) {
     });
 
     revalidatePath("/casos");
-    redirect(`/casos/${newCase.id}?ok=caso_creado`);
+    targetPath = `/casos/${newCase.id}?ok=caso_creado`;
   } catch (error) {
     const message = error instanceof Error ? error.message : "Error creando caso";
-    redirect(`/casos/nuevo?error=${encodeURIComponent(message)}`);
+    targetPath = `/casos/nuevo?error=${encodeURIComponent(message)}`;
   }
+
+  redirect(targetPath);
 }
 
 export async function updateCaseAction(caseId: string, formData: FormData) {
+  let targetPath = `/casos/${caseId}`;
+
   try {
     const supabase = await createSupabaseServerClient();
     const caseService = new CaseService(new CaseRepository(supabase));
@@ -114,11 +253,13 @@ export async function updateCaseAction(caseId: string, formData: FormData) {
     });
 
     revalidatePath(`/casos/${caseId}`);
-    redirect(`/casos/${caseId}?ok=caso_actualizado`);
+    targetPath = `/casos/${caseId}?ok=caso_actualizado`;
   } catch (error) {
     const message = error instanceof Error ? error.message : "Error actualizando caso";
-    redirect(`/casos/${caseId}?error=${encodeURIComponent(message)}`);
+    targetPath = `/casos/${caseId}?error=${encodeURIComponent(message)}`;
   }
+
+  redirect(targetPath);
 }
 
 export async function deleteCaseAction(caseId: string) {
@@ -213,7 +354,7 @@ export async function evaluateCaseAction(caseId: string) {
       case_id: caseId,
       tipo_decision: suggestion.tipoDecision,
       fundamento_juridico: suggestion.fundamento,
-      motivacion: suggestion.explicacion.resumen,
+      motivacion: suggestion.explicacion.argumentoEstandar,
       articulos_aplicados: "Por completar por operador jurídico",
       fecha_generacion: new Date().toISOString(),
       documento_url: null,
@@ -278,7 +419,6 @@ export async function generateDecisionDocumentAction(caseId: string) {
   const supabase = await createSupabaseServerClient();
   const caseService = new CaseService(new CaseRepository(supabase));
   const decisionService = new DecisionService(new DecisionRepository(supabase));
-  const templateRepository = new TemplateRepository(supabase);
   const auditService = new AuditService(new AuditRepository(supabase));
 
   const [caseRecord, decision] = await Promise.all([
@@ -294,35 +434,12 @@ export async function generateDecisionDocumentAction(caseId: string) {
     redirect(`/casos/${caseId}?error=Primero%20debes%20guardar%20la%20decisi%C3%B3n%20final`);
   }
 
-  const template = await templateRepository.findActiveByDecision(decision.tipo_decision);
-  const templateContent = template?.contenido_html ?? getDefaultTemplate();
-  const docxBuffer = await createDocxBufferFromTemplate(templateContent, {
-    radicado: caseRecord.radicado,
-    despacho: caseRecord.despacho ?? "Despacho por definir",
-    demandante: caseRecord.demandante_nombre,
-    demandado: caseRecord.demandado_nombre,
-    fundamento: decision.fundamento_juridico,
-    decision: decision.tipo_decision,
-  });
-
-  const objectPath = await uploadDecisionDocument({
-    caseId,
-    decisionId: decision.id,
-    fileName: `decision-${decision.id}.docx`,
-    content: docxBuffer,
-    contentType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-  });
-
-  if (!objectPath) {
-    redirect(`/casos/${caseId}?error=No%20fue%20posible%20subir%20el%20documento`);
-  }
-
-  await decisionService.attachDocument(decision.id, objectPath);
   await auditService.logCaseEvent(caseId, "document_generated", {
-    document_path: objectPath,
+    preview_mode: "html",
+    source_template: "institutional_docx",
   });
-  revalidatePath(`/casos/${caseId}`);
-  redirect(`/casos/${caseId}?ok=documento_generado`);
+
+  redirect(`/documentos/preview?caseId=${caseId}&source=word`);
 }
 
 export async function openGeneratedDocumentAction(caseId: string) {
