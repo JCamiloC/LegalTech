@@ -24,7 +24,7 @@ Sistema interno de apoyo jurídico para calificación de demandas civiles munici
 4. Integración real del motor de reglas `evaluateCase(caseId)`
 5. Pantalla de resultado con decisión sugerida y edición de motivación
 6. Generación de documento editable (preview + export)
-7. Upload a Storage y persistencia de `documento_url` en `decisions`
+7. Generación y descarga de DOCX bajo demanda (sin almacenamiento)
 8. Guardar decisión final en `cases.decision_final` y cierre del flujo
 
 ## Restricciones de implementación

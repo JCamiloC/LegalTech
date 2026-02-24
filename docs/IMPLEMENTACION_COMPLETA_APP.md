@@ -12,7 +12,7 @@ Completar el sistema interno de apoyo jurídico desde base de datos, autenticaci
 4. Mostrar decisión sugerida
 5. Permitir edición de motivación
 6. Generar documento editable
-7. Guardar decisión final y URL del documento
+7. Guardar decisión final
 
 ## 3. Base de datos (Supabase)
 
@@ -28,7 +28,7 @@ Contiene:
 - Tablas: `profiles`, `cases`, `case_requirements_check`, `decisions`, `legal_articles`, `rule_definitions`, `document_templates`
 - Triggers de `updated_at`
 - Trigger de sincronización `auth.users -> profiles`
-- Bucket privado `decision-documents`
+- Campo `decisions.documento_url` reservado para integraciones futuras (no usado en flujo actual)
 
 ### 3.2 Seeds iniciales
 
@@ -43,7 +43,6 @@ Ejecutar y validar que retorne datos:
 ```sql
 select count(*) from public.rule_definitions where activo = true;
 select count(*) from public.legal_articles;
-select * from storage.buckets where id = 'decision-documents';
 ```
 
 ## 4. Variables de entorno
@@ -107,7 +106,7 @@ Responsable de:
 
 - Guardar decisión sugerida/final
 - Persistir `fundamento_juridico`, `motivacion`, `articulos_aplicados`
-- Asociar `documento_url`
+- Mantener trazabilidad de la decisión final del caso
 
 ### 6.4 Módulo `documents`
 
@@ -121,8 +120,7 @@ Responsable de:
   - `{{fundamento}}`
   - `{{decision}}`
 - Mostrar preview
-- Exportar HTML/DOCX
-- Subir a Storage bucket `decision-documents`
+- Exportar/descargar DOCX bajo demanda (sin persistir archivo)
 
 ## 7. Flujo técnico completo (request lifecycle)
 
@@ -135,9 +133,8 @@ Responsable de:
 7. Sistema muestra sugerencia editable
 8. Usuario ajusta motivación
 9. Sistema renderiza documento y preview
-10. Sistema exporta/sube documento a Storage
-11. Sistema guarda decisión en `decisions` con `documento_url`
-12. Sistema actualiza `cases.decision_final` y `cases.estado='decidido'`
+10. Sistema genera y descarga documento final DOCX bajo demanda
+11. Sistema actualiza `cases.decision_final` y `cases.estado='decidido'`
 
 ## 8. Server Actions recomendadas
 
@@ -145,7 +142,7 @@ Responsable de:
 - `saveChecklistAction(caseId, checklist)`
 - `evaluateCaseAction(caseId)`
 - `saveDecisionAction(caseId, payload)`
-- `generateDecisionDocumentAction(decisionId)`
+- `generateDecisionDocumentAction(caseId)`
 
 Todas deben:
 
@@ -161,7 +158,7 @@ La app está completa cuando:
 - Se puede crear caso y checklist
 - `evaluateCase` devuelve una sugerencia consistente
 - Se puede editar motivación y guardar decisión
-- Se genera documento y queda URL persistida
+- Se genera y descarga documento DOCX bajo demanda
 - Build en Next.js compila sin errores
 
 ## 10. Plan de ejecución sugerido en una sola corrida
@@ -172,7 +169,7 @@ La app está completa cuando:
 4. Formulario checklist
 5. Integrar `evaluateCase`
 6. Pantalla de resultado editable
-7. Preview/exportación y upload a storage
+7. Preview y descarga DOCX bajo demanda
 8. Guardado final de `decisions`
 9. Pruebas funcionales end-to-end
 
@@ -180,7 +177,7 @@ La app está completa cuando:
 
 - Regla mal configurada en JSON: agregar validación de estructura
 - Documento sin plantilla activa: fallback a plantilla por defecto
-- Fallo en upload de storage: mantener preview local y reintento
+- Error en generación DOCX: mantener preview HTML como respaldo
 - Inconsistencias de estado del caso: transacción para guardado final
 
 ## 12. Fase posterior

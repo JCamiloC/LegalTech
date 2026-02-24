@@ -103,6 +103,9 @@ export default async function CasosPage({
           <Link href="/casos/nuevo" className="theme-btn-primary">
             Nuevo caso
           </Link>
+          <Link href="/asistente" className="rounded-lg border border-slate-300 px-4 py-2 text-sm">
+            Asistente offline
+          </Link>
           <Link href="/reglas" className="theme-btn-rules">
             Reglas
           </Link>

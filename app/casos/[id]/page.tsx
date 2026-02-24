@@ -3,12 +3,12 @@ import { notFound } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import FeedbackToast from "@/components/FeedbackToast";
 import { CaseRepository, CaseService } from "@/modules/cases";
+import { PROCESS_TYPE_OPTIONS } from "@/modules/cases/process-options";
 import { DecisionRepository, DecisionService } from "@/modules/decisions";
 import {
   deleteCaseAction,
   evaluateCaseAction,
   generateDecisionDocumentAction,
-  openGeneratedDocumentAction,
   saveChecklistAction,
   updateCaseAction,
   saveDecisionAction,
@@ -52,7 +52,6 @@ export default async function CasoDetallePage({ params, searchParams }: CasoDeta
   const saveDecision = saveDecisionAction.bind(null, id);
   const generateDocument = generateDecisionDocumentAction.bind(null, id);
   const updateCase = updateCaseAction.bind(null, id);
-  const openGeneratedDocument = openGeneratedDocumentAction.bind(null, id);
   const deleteCase = deleteCaseAction.bind(null, id);
   const hasChecklist = Boolean(checklist);
   const isPending = caseRecord.estado === "pendiente";
@@ -71,7 +70,7 @@ export default async function CasoDetallePage({ params, searchParams }: CasoDeta
       : "Siguiente paso: diligenciar y guardar checklist."
     : isReview
       ? "Siguiente paso: validar sugerencia y guardar decisión final."
-      : "Siguiente paso: generar y subir documento definitivo.";
+      : "Siguiente paso: generar y descargar documento definitivo.";
 
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-6xl flex-col gap-6 px-4 py-8 sm:px-6 sm:py-10">
@@ -88,6 +87,9 @@ export default async function CasoDetallePage({ params, searchParams }: CasoDeta
         <div className="flex flex-wrap gap-2">
           <Link href="/casos" className="rounded-lg border border-slate-300 px-4 py-2 text-sm">
             Volver a casos
+          </Link>
+          <Link href={`/asistente?caseId=${id}`} className="rounded-lg border border-slate-300 px-4 py-2 text-sm">
+            Consultar asistente
           </Link>
           <form action={deleteCase}>
             <button type="submit" className="rounded-lg border border-red-300 px-4 py-2 text-sm text-red-700">
@@ -137,7 +139,13 @@ export default async function CasoDetallePage({ params, searchParams }: CasoDeta
           <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Datos del proceso</h2>
           <form action={updateCase} className="mt-2 grid gap-2">
             <input name="radicado" defaultValue={caseRecord.radicado} className="rounded-md border border-slate-300 px-2 py-1 text-sm" />
-            <input name="tipo_proceso" defaultValue={caseRecord.tipo_proceso} className="rounded-md border border-slate-300 px-2 py-1 text-sm" />
+            <select name="tipo_proceso" defaultValue={caseRecord.tipo_proceso} className="rounded-md border border-slate-300 px-2 py-1 text-sm" required>
+              {PROCESS_TYPE_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
             <input name="subtipo_proceso" defaultValue={caseRecord.subtipo_proceso ?? ""} className="rounded-md border border-slate-300 px-2 py-1 text-sm" />
             <input name="demandante_nombre" defaultValue={caseRecord.demandante_nombre} className="rounded-md border border-slate-300 px-2 py-1 text-sm" />
             <input name="demandado_nombre" defaultValue={caseRecord.demandado_nombre} className="rounded-md border border-slate-300 px-2 py-1 text-sm" />
@@ -155,14 +163,7 @@ export default async function CasoDetallePage({ params, searchParams }: CasoDeta
           <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Decisiones</h2>
           <p className="mt-2 text-sm text-slate-700">Sugerida: {caseRecord.decision_sugerida ?? "Sin evaluar"}</p>
           <p className="text-sm text-slate-700">Final: {caseRecord.decision_final ?? "Pendiente"}</p>
-          <p className="text-sm text-slate-700">Documento: vista HTML con plantilla institucional</p>
-          {latestDecision?.documento_url ? (
-            <form action={openGeneratedDocument} className="mt-2">
-              <button type="submit" className="rounded-md border border-slate-300 px-3 py-1 text-xs">
-                Abrir documento histórico (storage)
-              </button>
-            </form>
-          ) : null}
+          <p className="text-sm text-slate-700">Documento: descarga bajo demanda en formato DOCX (sin almacenamiento)</p>
         </div>
           </section>
 
@@ -338,11 +339,11 @@ export default async function CasoDetallePage({ params, searchParams }: CasoDeta
                 className="rounded-lg border border-slate-300 px-4 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-50"
                 title={
                   isDecided
-                    ? "Genera la vista final en HTML usando la plantilla institucional"
+                    ? "Genera y descarga el DOCX final usando la plantilla institucional"
                     : "Disponible cuando el caso esté en estado decidido"
                 }
               >
-                Generar vista final (HTML)
+                Generar y descargar DOCX
               </button>
             </form>
             <Link href={`/documentos/preview?caseId=${id}&source=word`} className="rounded-lg border border-slate-300 px-4 py-2 text-sm">

@@ -5,3 +5,4 @@ export * as DocumentsModule from "./documents";
 export * as LegalModule from "./legal";
 export * as AuthModule from "./auth";
 export * as AuditModule from "./audit";
+export * as ExpertModule from "./expert";

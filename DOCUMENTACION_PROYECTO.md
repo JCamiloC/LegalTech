@@ -40,7 +40,7 @@ Reglas de negocio clave:
 - `cases.estado` inicia en `pendiente`
 - `cases.decision_sugerida` se llena al ejecutar motor de reglas
 - `cases.decision_final` se llena tras validación humana
-- `decisions.documento_url` guarda la ubicación del archivo generado
+- `decisions.documento_url` queda reservado para integraciones futuras
 
 ## 4) Motor de reglas
 
@@ -78,7 +78,7 @@ Objetivo:
   - `{{fundamento}}`
   - `{{decision}}`
 - Proveer vista previa antes de exportar
-- Persistir URL del documento en `decisions.documento_url`
+- Generar y descargar `DOCX` bajo demanda (sin almacenamiento permanente del archivo)
 
 ## 6) Flujo funcional implementado como base
 

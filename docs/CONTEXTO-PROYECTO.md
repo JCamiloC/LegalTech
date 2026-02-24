@@ -15,7 +15,7 @@ Sistema interno de apoyo jurídico para calificación de demandas en juzgados ci
 ## Stack
 
 - Frontend: Next.js (deploy en Vercel)
-- Backend: Supabase (PostgreSQL + Auth + Storage)
+- Backend: Supabase (PostgreSQL + Auth)
 - Arquitectura modular en `src/modules`
 
 ## Flujo funcional objetivo

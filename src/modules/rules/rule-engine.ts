@@ -32,6 +32,18 @@ function getFieldValue(context: EvaluationContext, field: string) {
   return context[field];
 }
 
+function normalizeStringValue(value: string): string {
+  return value.trim().replace(/\s+/g, " ").toLowerCase();
+}
+
+function normalizeComparableValue(value: unknown): unknown {
+  if (typeof value === "string") {
+    return normalizeStringValue(value);
+  }
+
+  return value;
+}
+
 function isNumericComparable(value: unknown): boolean {
   if (value === null || value === undefined) return false;
   const numericValue = Number(value);
@@ -88,7 +100,10 @@ function evaluateCondition(condition: RuleCondition, context: EvaluationContext)
       return Boolean(getFieldValue(context, condition.field)) === false;
     case "in": {
       const currentValue = getFieldValue(context, condition.field);
-      return condition.value.includes(currentValue as string | number | boolean);
+      const normalizedCurrent = normalizeComparableValue(currentValue);
+      return condition.value
+        .map((item) => normalizeComparableValue(item))
+        .includes(normalizedCurrent as string | number | boolean);
     }
     case "eq":
     case "neq":
@@ -98,12 +113,14 @@ function evaluateCondition(condition: RuleCondition, context: EvaluationContext)
     case "lt": {
       const currentValue = getFieldValue(context, condition.field) as string | number | boolean | null | undefined;
       const targetValue = condition.value;
+      const normalizedCurrent = normalizeComparableValue(currentValue);
+      const normalizedTarget = normalizeComparableValue(targetValue);
 
       switch (condition.op) {
         case "eq":
-          return currentValue === targetValue;
+          return normalizedCurrent === normalizedTarget;
         case "neq":
-          return currentValue !== targetValue;
+          return normalizedCurrent !== normalizedTarget;
         case "gte":
           if (!isNumericComparable(currentValue) || !isNumericComparable(targetValue)) return false;
           return Number(currentValue) >= Number(targetValue);

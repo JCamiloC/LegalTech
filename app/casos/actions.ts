@@ -13,9 +13,6 @@ import { CaseRepository } from "@/modules/cases";
 import { CaseService } from "@/modules/cases/case.service";
 import { AuditRepository, AuditService } from "@/modules/audit";
 import { DecisionRepository, DecisionService } from "@/modules/decisions";
-import {
-  getSignedDecisionDocumentUrl,
-} from "@/modules/documents";
 import { evaluateCase } from "@/modules/rules";
 import type { DecisionType } from "@/types";
 
@@ -73,18 +70,22 @@ function parseCuantia(rawValue: string | null): string | null {
 
 function inferTipoProceso(text: string, extracted: string | null): string | null {
   if (extracted) {
-    return extracted;
+    return extracted.trim().toLowerCase();
   }
 
   const lower = text.toLowerCase();
 
-  if (lower.includes("proceso ejecutivo")) return "Ejecutivo";
-  if (lower.includes("demanda ejecutiva para la efectividad de la garant") ) return "Ejecutivo con garantía real";
-  if (lower.includes("proceso verbal")) return "Verbal";
-  if (lower.includes("proceso monitorio")) return "Monitorio";
-  if (lower.includes("proceso ordinario")) return "Ordinario";
+  if (lower.includes("proceso ejecutivo")) return "ejecutivo";
+  if (lower.includes("demanda ejecutiva para la efectividad de la garant") ) return "ejecutivo con garantía real";
+  if (lower.includes("proceso verbal")) return "verbal";
+  if (lower.includes("proceso monitorio")) return "monitorio";
+  if (lower.includes("proceso ordinario")) return "ordinario";
 
   return null;
+}
+
+function normalizeTipoProcesoInput(rawValue: string): string {
+  return rawValue.trim().replace(/\s+/g, " ").toLowerCase();
 }
 
 async function extractTextFromPdfFile(file: File): Promise<string> {
@@ -95,27 +96,51 @@ async function extractTextFromPdfFile(file: File): Promise<string> {
   return normalizeDocumentText(result.text ?? "");
 }
 
+async function extractTextFromPdfFiles(files: File[]): Promise<string> {
+  const chunks = await Promise.all(
+    files.map(async (file, index) => {
+      const text = await extractTextFromPdfFile(file);
+      return `\n\n--- DOCUMENTO ${index + 1}: ${file.name} ---\n${text}`;
+    })
+  );
+
+  return normalizeDocumentText(chunks.join("\n"));
+}
+
+function ensurePdfFile(value: FormDataEntryValue | null, errorMessage: string): File {
+  if (!(value instanceof File)) {
+    throw new Error(errorMessage);
+  }
+
+  const isPdf = value.type === "application/pdf" || value.name.toLowerCase().endsWith(".pdf");
+
+  if (!isPdf) {
+    throw new Error("Formato no soportado. Use archivos .pdf");
+  }
+
+  return value;
+}
+
 export async function parseDemandDocumentAction(formData: FormData) {
   let targetPath = "/casos/nuevo";
 
   try {
-    const file = formData.get("demanda_file");
+    const demandaPrincipal = ensurePdfFile(
+      formData.get("demanda_principal"),
+      "Debe adjuntar la demanda principal en PDF"
+    );
 
-    if (!(file instanceof File)) {
-      throw new Error("Debe adjuntar un archivo PDF de la demanda");
-    }
+    const anexosEntries = formData.getAll("anexos_files");
+    const anexosFiles = anexosEntries
+      .filter((entry): entry is File => entry instanceof File && entry.size > 0)
+      .map((entry) => ensurePdfFile(entry, "Uno de los anexos no es válido"));
 
-    const isPdf = file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
-
-    if (!isPdf) {
-      throw new Error("Formato no soportado. Use archivo .pdf");
-    }
-
-    const text = await extractTextFromPdfFile(file);
+    const allFiles = [demandaPrincipal, ...anexosFiles];
+    const text = await extractTextFromPdfFiles(allFiles);
 
     if (!text.trim() || text.trim().length < 80) {
       throw new Error(
-        "No se pudo extraer texto suficiente del PDF. Si es un escaneo (imagen), el siguiente paso es activar OCR avanzado de imagen."
+        "No se pudo extraer texto suficiente del expediente para prellenar el caso. Verifica que los PDFs tengan texto legible."
       );
     }
 
@@ -157,7 +182,7 @@ export async function parseDemandDocumentAction(formData: FormData) {
     ]);
 
     const query = new URLSearchParams();
-    query.set("ok", "documento_importado");
+    query.set("ok", "expediente_importado");
 
     if (radicado) query.set("radicado", radicado);
     if (demandante) query.set("demandante_nombre", demandante);
@@ -196,7 +221,9 @@ export async function createCaseAction(formData: FormData) {
         "Demandante requerido"
       ),
       demandado_nombre: ensureNonEmpty(String(formData.get("demandado_nombre") ?? ""), "Demandado requerido"),
-      tipo_proceso: ensureNonEmpty(String(formData.get("tipo_proceso") ?? ""), "Tipo de proceso requerido"),
+      tipo_proceso: normalizeTipoProcesoInput(
+        ensureNonEmpty(String(formData.get("tipo_proceso") ?? ""), "Tipo de proceso requerido")
+      ),
       subtipo_proceso: toNullableString(formData.get("subtipo_proceso")),
       cuantia: parsePositiveNumber(formData.get("cuantia")),
       competencia_territorial: toNullableString(formData.get("competencia_territorial")),
@@ -237,7 +264,9 @@ export async function updateCaseAction(caseId: string, formData: FormData) {
         "Demandante requerido"
       ),
       demandado_nombre: ensureNonEmpty(String(formData.get("demandado_nombre") ?? ""), "Demandado requerido"),
-      tipo_proceso: ensureNonEmpty(String(formData.get("tipo_proceso") ?? ""), "Tipo de proceso requerido"),
+      tipo_proceso: normalizeTipoProcesoInput(
+        ensureNonEmpty(String(formData.get("tipo_proceso") ?? ""), "Tipo de proceso requerido")
+      ),
       subtipo_proceso: toNullableString(formData.get("subtipo_proceso")),
       cuantia: parsePositiveNumber(formData.get("cuantia")),
       competencia_territorial: toNullableString(formData.get("competencia_territorial")),
@@ -435,27 +464,9 @@ export async function generateDecisionDocumentAction(caseId: string) {
   }
 
   await auditService.logCaseEvent(caseId, "document_generated", {
-    preview_mode: "html",
-    source_template: "institutional_docx",
+    generation_mode: "docx_download",
+    storage: "disabled",
   });
 
-  redirect(`/documentos/preview?caseId=${caseId}&source=word`);
-}
-
-export async function openGeneratedDocumentAction(caseId: string) {
-  const supabase = await createSupabaseServerClient();
-  const decisionService = new DecisionService(new DecisionRepository(supabase));
-  const decision = await decisionService.getLatestByCaseId(caseId);
-
-  if (!decision?.documento_url) {
-    redirect(`/casos/${caseId}?error=No%20hay%20documento%20generado`);
-  }
-
-  const signedUrl = await getSignedDecisionDocumentUrl(decision.documento_url);
-
-  if (!signedUrl) {
-    redirect(`/casos/${caseId}?error=No%20fue%20posible%20abrir%20documento`);
-  }
-
-  redirect(signedUrl);
+  redirect(`/documentos/descargar?caseId=${caseId}&source=word`);
 }
