@@ -1,9 +1,8 @@
 import Link from "next/link";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { CaseRepository, CaseService } from "@/modules/cases";
-import { LegalArticlesRepository } from "@/modules/legal";
-import { RuleRepository } from "@/modules/rules";
-import { ExpertAssistantService } from "@/modules/expert";
+import FeedbackToast from "@/components/FeedbackToast";
+import { AssistantMemoryRepository } from "@/modules/expert";
+import { consultAssistantAction, rateAssistantInteractionAction } from "./actions";
 
 interface AsistentePageProps {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
@@ -21,35 +20,39 @@ export default async function AsistentePage({ searchParams }: AsistentePageProps
   const resolvedSearchParams = (await searchParams) ?? {};
   const question = normalize(resolvedSearchParams.q).trim();
   const caseId = normalize(resolvedSearchParams.caseId).trim();
+  const interactionId = normalize(resolvedSearchParams.interactionId).trim();
+  const okMessage = normalize(resolvedSearchParams.ok).trim();
+  const errorMessage = normalize(resolvedSearchParams.error).trim();
 
   const supabase = await createSupabaseServerClient();
-  const caseRepository = new CaseRepository(supabase);
-  const caseService = new CaseService(caseRepository);
-  const legalRepository = new LegalArticlesRepository(supabase);
-  const ruleRepository = new RuleRepository(supabase);
-
-  const assistant = new ExpertAssistantService({
-    getCaseById: (id) => caseService.getCaseById(id),
-    getChecklist: (id) => caseService.getLatestChecklist(id),
-    listActiveRules: () => ruleRepository.listActiveRules(),
-    listLegalArticles: () => legalRepository.listAll(),
-  });
-
-  const response =
-    question.length > 0
-      ? await assistant.answer({
-          question,
-          caseId: caseId.length > 0 ? caseId : undefined,
-        })
-      : null;
+  const memoryRepository = new AssistantMemoryRepository(supabase);
+  const interaction = interactionId ? await memoryRepository.findById(interactionId) : null;
+  const response = interaction?.response_json ?? null;
+  const displayedQuestion = interaction?.question ?? question;
+  const displayedCaseId = interaction?.case_id ?? (caseId || "");
+  const rateUsefulAction = interaction ? rateAssistantInteractionAction.bind(null, interaction.id, true) : null;
+  const rateNotUsefulAction = interaction ? rateAssistantInteractionAction.bind(null, interaction.id, false) : null;
 
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-5xl flex-col gap-6 px-4 py-8 sm:px-6 sm:py-10">
+      <FeedbackToast
+        message={
+          okMessage === "consulta_registrada"
+            ? "Consulta registrada en memoria del asistente."
+            : okMessage === "feedback_util"
+              ? "Feedback registrado: respuesta útil."
+              : okMessage === "feedback_no_util"
+                ? "Feedback registrado: respuesta no útil."
+                : undefined
+        }
+        tone="success"
+      />
+      <FeedbackToast message={errorMessage || undefined} tone="error" />
       <header className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-semibold text-slate-900">Asistente experto offline</h1>
           <p className="mt-1 text-sm text-slate-600">
-            Orientación local basada en reglas y artículos cargados en la app. No usa APIs externas.
+            Orientación local con memoria incremental basada en reglas, artículos y consultas históricas. No usa APIs externas.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -63,12 +66,12 @@ export default async function AsistentePage({ searchParams }: AsistentePageProps
       </header>
 
       <section className="rounded-xl border border-slate-200 bg-white p-5">
-        <form method="get" className="grid gap-3">
+        <form action={consultAssistantAction} className="grid gap-3">
           <label className="text-sm text-slate-700">
             ID de caso (opcional)
             <input
               name="caseId"
-              defaultValue={caseId}
+              defaultValue={displayedCaseId}
               className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
               placeholder="UUID del caso para orientación contextual"
             />
@@ -77,7 +80,7 @@ export default async function AsistentePage({ searchParams }: AsistentePageProps
             Pregunta
             <textarea
               name="q"
-              defaultValue={question}
+              defaultValue={displayedQuestion}
               required
               className="mt-1 h-24 w-full rounded-lg border border-slate-300 p-2 text-sm"
               placeholder="Ej: ¿Qué debo revisar para un proceso ejecutivo con título?"
@@ -85,7 +88,7 @@ export default async function AsistentePage({ searchParams }: AsistentePageProps
           </label>
           <div>
             <button type="submit" className="rounded-lg bg-slate-900 px-4 py-2 text-sm text-white">
-              Consultar asistente
+              Consultar y guardar aprendizaje
             </button>
           </div>
         </form>
@@ -154,6 +157,30 @@ export default async function AsistentePage({ searchParams }: AsistentePageProps
           <div className="rounded-lg bg-slate-50 p-3 text-sm text-slate-700">
             <strong>Siguiente paso sugerido:</strong> {response.siguientePaso}
           </div>
+
+          {interaction && rateUsefulAction && rateNotUsefulAction ? (
+            <div className="rounded-lg border border-slate-200 p-3">
+              <p className="text-sm font-medium text-slate-800">¿La respuesta fue útil?</p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                <form action={rateUsefulAction}>
+                  <input type="hidden" name="feedback_notes" value="" />
+                  <button type="submit" className="rounded-md border border-emerald-300 px-3 py-1 text-xs text-emerald-700">
+                    Sí, útil
+                  </button>
+                </form>
+                <form action={rateNotUsefulAction} className="flex items-center gap-2">
+                  <input
+                    name="feedback_notes"
+                    placeholder="¿Qué faltó? (opcional)"
+                    className="rounded-md border border-slate-300 px-2 py-1 text-xs"
+                  />
+                  <button type="submit" className="rounded-md border border-rose-300 px-3 py-1 text-xs text-rose-700">
+                    No útil
+                  </button>
+                </form>
+              </div>
+            </div>
+          ) : null}
         </section>
       ) : null}
     </main>

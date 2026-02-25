@@ -4,9 +4,6 @@
 name: Build and deploy Node.js app to Azure Web App - legaltech-app
 
 on:
-  push:
-    branches:
-      - main
   workflow_dispatch:
 
 concurrency:
