@@ -237,6 +237,11 @@ Este error casi siempre es fallo de arranque en App Service.
    - Dependencias incompletas o startup incorrecto. Usa `npm start` y verifica instalación.
 - `Node version not supported`
    - Fija Node 20 en App Service (`WEBSITE_NODE_DEFAULT_VERSION=~20`).
+- `Conflict (CODE: 409)` en `azure/webapps-deploy`
+   - Hay un deploy en curso o colgado en Kudu/OneDeploy.
+   - En Azure Portal abre tu Web App -> `Deployment Center` y verifica estado.
+   - Si hay despliegue trabado, reinicia la Web App y vuelve a ejecutar el workflow.
+   - Evita pushes simultáneos a `main` (el workflow ya tiene control de concurrencia).
 
 Con esta base, el 503 suele resolverse sin cambios adicionales.
 
