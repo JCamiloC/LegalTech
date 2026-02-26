@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { createCaseAction, parseDemandDocumentAction } from "../actions";
 import FeedbackToast from "@/components/FeedbackToast";
+import { PROCESS_TYPE_OPTIONS } from "@/modules/cases/process-options";
 
 interface NuevoCasoPageProps {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
@@ -34,7 +35,7 @@ export default async function NuevoCasoPage({ searchParams }: NuevoCasoPageProps
     <main className="mx-auto flex min-h-screen w-full max-w-5xl flex-col gap-6 px-6 py-10">
       <FeedbackToast message={errorMessage} tone="error" />
       <FeedbackToast
-        message={okMessage === "documento_importado" ? "Documento leído. Verifica y corrige antes de guardar." : undefined}
+        message={okMessage === "expediente_importado" ? "Expediente leído. Verifica y corrige antes de guardar." : undefined}
         tone="success"
       />
       <header>
@@ -48,21 +49,41 @@ export default async function NuevoCasoPage({ searchParams }: NuevoCasoPageProps
       </header>
 
       <section className="rounded-xl border border-indigo-200 bg-indigo-50 p-5">
-        <h2 className="text-lg font-semibold text-indigo-900">Importar demanda desde PDF (.pdf)</h2>
+        <h2 className="text-lg font-semibold text-indigo-900">Importar expediente desde PDF (.pdf)</h2>
         <p className="mt-1 text-sm text-indigo-700">
-          Sube la demanda en PDF y el sistema intentará prellenar el formulario automáticamente.
+          Carga la demanda principal y, opcionalmente, anexos para mejorar el autollenado del caso.
         </p>
-        <form action={parseDemandDocumentAction} className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center">
-          <input
-            type="file"
-            name="demanda_file"
-            accept=".pdf,application/pdf"
-            required
-            className="w-full rounded-lg border border-indigo-300 bg-white px-3 py-2 text-sm"
-          />
-          <button type="submit" className="theme-btn-primary whitespace-nowrap">
-            Leer documento
-          </button>
+        <form action={parseDemandDocumentAction} className="mt-4 grid gap-3 sm:grid-cols-2">
+          <div>
+            <label className="mb-1 block text-xs font-medium text-indigo-900">Demanda principal (obligatorio)</label>
+            <input
+              type="file"
+              name="demanda_principal"
+              accept=".pdf,application/pdf"
+              required
+              className="w-full rounded-lg border border-indigo-300 bg-white px-3 py-2 text-sm"
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-indigo-900">Anexos (opcional, múltiples)</label>
+            <input
+              type="file"
+              name="anexos_files"
+              accept=".pdf,application/pdf"
+              multiple
+              className="w-full rounded-lg border border-indigo-300 bg-white px-3 py-2 text-sm"
+            />
+          </div>
+          <div className="sm:col-span-2">
+            <p className="mb-2 text-xs text-indigo-700">
+              El sistema leerá todos los PDFs cargados para inferir radicado, partes, tipo de proceso, cuantía y competencia.
+            </p>
+          </div>
+          <div className="sm:col-span-2">
+            <button type="submit" className="theme-btn-primary whitespace-nowrap">
+              Analizar expediente
+            </button>
+          </div>
         </form>
       </section>
 
@@ -80,12 +101,21 @@ export default async function NuevoCasoPage({ searchParams }: NuevoCasoPageProps
 
           <label className="text-sm text-slate-700">
             Tipo de proceso
-            <input
+            <select
               name="tipo_proceso"
               defaultValue={defaults.tipo_proceso}
               required
               className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
-            />
+            >
+              <option value="" disabled>
+                Seleccione tipo de proceso
+              </option>
+              {PROCESS_TYPE_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
           </label>
 
           <label className="text-sm text-slate-700">

@@ -1,0 +1,40 @@
+name: Deploy LegalTech to Azure VM
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-legaltech-vm
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.AZURE_VM_HOST }}
+          username: ${{ secrets.AZURE_VM_USER }}
+          key: ${{ secrets.AZURE_VM_SSH_KEY }}
+          script_stop: true
+          script: |
+            set -e
+            if [ ! -d /opt/legaltech/.git ]; then
+              mkdir -p /opt/legaltech
+              cd /opt/legaltech
+              git clone ${{ secrets.VM_REPO_CLONE_URL }} .
+            fi
+
+            cd /opt/legaltech
+            git fetch origin
+            git reset --hard origin/main
+
+            docker compose -f docker-compose.vm.yml pull || true
+            docker compose -f docker-compose.vm.yml up -d --build
+
+            docker image prune -f

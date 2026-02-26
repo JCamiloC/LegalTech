@@ -16,6 +16,14 @@ function normalizeMessage(value: string | string[] | undefined) {
   return value;
 }
 
+function FieldHint({ text }: { text: string }) {
+  return (
+    <span title={text} className="inline-flex cursor-help items-center rounded-full border border-slate-300 px-2 py-0.5 text-[11px] text-slate-500">
+      ?
+    </span>
+  );
+}
+
 export default async function ReglasPage({ searchParams }: ReglasPageProps) {
   const resolvedSearchParams = (await searchParams) ?? {};
   const okMessage = normalizeMessage(resolvedSearchParams.ok);
@@ -32,7 +40,7 @@ export default async function ReglasPage({ searchParams }: ReglasPageProps) {
       <header className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-semibold text-slate-900">Gestión de reglas</h1>
-          <p className="mt-1 text-sm text-slate-600">Configura prioridad, condición JSON y estado de ejecución.</p>
+          <p className="mt-1 text-sm text-slate-600">Define reglas jurídicas de forma guiada: resultado, prioridad, fundamento y condición lógica.</p>
         </div>
         <Link href="/casos" className="theme-btn-rules">
           Volver a casos
@@ -64,8 +72,20 @@ export default async function ReglasPage({ searchParams }: ReglasPageProps) {
 
       <section className="rounded-xl border border-slate-200 bg-white p-5">
         <h2 className="text-lg font-semibold text-slate-900">Nueva regla</h2>
+        <div className="mt-3 rounded-lg border border-indigo-200 bg-indigo-50 p-3 text-xs text-indigo-900">
+          <p className="font-semibold">Guía rápida para operador jurídico</p>
+          <ul className="mt-2 list-disc space-y-1 pl-4">
+            <li><strong>Resultado:</strong> define el tipo de auto sugerido cuando la condición se cumple.</li>
+            <li><strong>Prioridad:</strong> número más bajo = mayor precedencia si varias reglas coinciden.</li>
+            <li><strong>Fundamento jurídico:</strong> texto que respalda la sugerencia que verá el despacho.</li>
+            <li><strong>Condición:</strong> lógica de activación de la regla sobre datos del caso/checklist.</li>
+          </ul>
+        </div>
         <details className="mt-3 rounded-lg border border-slate-200 bg-slate-50 p-3">
           <summary className="cursor-pointer text-sm font-medium text-slate-700">Plantillas JSON rápidas</summary>
+          <p className="mt-2 text-xs text-slate-500">
+            Campos recomendados: <code>cumple_art_82</code>, <code>anexos_completos</code>, <code>competencia_valida</code>, <code>caducidad</code>, <code>prescripcion</code>, <code>tipo_proceso</code>, <code>titulo_ejecutivo_valido</code>, <code>cuantia</code>.
+          </p>
           <div className="mt-3 grid gap-3 md:grid-cols-2">
             <div>
               <p className="mb-1 text-xs font-medium text-slate-600">Booleano simple</p>
@@ -102,23 +122,46 @@ export default async function ReglasPage({ searchParams }: ReglasPageProps) {
           </div>
         </details>
         <form action={createRuleAction} className="mt-4 grid gap-3">
-          <input name="nombre" placeholder="Nombre de regla" className="rounded-lg border border-slate-300 px-3 py-2 text-sm" required />
-          <input
-            name="descripcion"
-            placeholder="Descripción funcional"
-            className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
-            required
-          />
-          <textarea
-            name="condicion_json"
-            placeholder='{"op":"is_true","field":"caducidad"}'
-            className="h-24 rounded-lg border border-slate-300 px-3 py-2 font-mono text-xs"
-            required
-          />
+          <label className="space-y-1 text-sm text-slate-700">
+            <span className="flex items-center gap-2">Nombre de regla <FieldHint text="Identificación corta y clara para el equipo jurídico." /></span>
+            <input name="nombre" placeholder="Ej: Rechazo por caducidad" className="rounded-lg border border-slate-300 px-3 py-2 text-sm" required />
+          </label>
+          <label className="space-y-1 text-sm text-slate-700">
+            <span className="flex items-center gap-2">Descripción funcional <FieldHint text="Explica en lenguaje simple cuándo aplica la regla." /></span>
+            <input
+              name="descripcion"
+              placeholder="Ej: Si hay caducidad declarada, sugerir auto de rechazo"
+              className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
+              required
+            />
+          </label>
+          <label className="space-y-1 text-sm text-slate-700">
+            <span className="flex items-center gap-2">Condición de activación (JSON) <FieldHint text="Se evalúa contra datos del caso y checklist. Si se cumple, aplica el resultado." /></span>
+            <textarea
+              name="condicion_json"
+              placeholder='{"op":"is_true","field":"caducidad"}'
+              className="h-24 rounded-lg border border-slate-300 px-3 py-2 font-mono text-xs"
+              required
+            />
+          </label>
           <div className="grid gap-3 md:grid-cols-3">
-            <input name="resultado" placeholder="auto_inadmisorio" className="rounded-lg border border-slate-300 px-3 py-2 text-sm" required />
-            <input name="prioridad" type="number" min={1} placeholder="Prioridad" className="rounded-lg border border-slate-300 px-3 py-2 text-sm" required />
-            <input name="fundamento" placeholder="Fundamento jurídico" className="rounded-lg border border-slate-300 px-3 py-2 text-sm" required />
+            <label className="space-y-1 text-sm text-slate-700">
+              <span className="flex items-center gap-2">Resultado <FieldHint text="Tipo de decisión sugerida cuando la regla coincide." /></span>
+              <select name="resultado" defaultValue="auto_inadmisorio" className="rounded-lg border border-slate-300 px-3 py-2 text-sm" required>
+                <option value="auto_admisorio">auto_admisorio</option>
+                <option value="auto_inadmisorio">auto_inadmisorio</option>
+                <option value="mandamiento_pago">mandamiento_pago</option>
+                <option value="auto_rechaza_demanda">auto_rechaza_demanda</option>
+              </select>
+            </label>
+            <label className="space-y-1 text-sm text-slate-700">
+              <span className="flex items-center gap-2">Prioridad <FieldHint text="Entre varias reglas coincidentes, se aplica primero la de menor número." /></span>
+              <input name="prioridad" type="number" min={1} placeholder="1" className="rounded-lg border border-slate-300 px-3 py-2 text-sm" required />
+            </label>
+            <label className="space-y-1 text-sm text-slate-700">
+              <span className="flex items-center gap-2">Fundamento jurídico <FieldHint text="Texto base que respalda jurídicamente la decisión sugerida." /></span>
+              <input name="fundamento" placeholder="Citar motivo jurídico de aplicación" className="rounded-lg border border-slate-300 px-3 py-2 text-sm" required />
+            </label>
           </div>
           <div>
             <button type="submit" className="theme-btn-primary">
@@ -151,23 +194,46 @@ export default async function ReglasPage({ searchParams }: ReglasPageProps) {
                 </div>
 
                 <form action={updateAction} className="grid gap-2">
-                  <input name="nombre" defaultValue={rule.nombre} className="rounded-md border border-slate-300 px-2 py-1 text-sm" required />
-                  <input
-                    name="descripcion"
-                    defaultValue={rule.descripcion}
-                    className="rounded-md border border-slate-300 px-2 py-1 text-sm"
-                    required
-                  />
-                  <textarea
-                    name="condicion_json"
-                    defaultValue={JSON.stringify(rule.condicion_json)}
-                    className="h-20 rounded-md border border-slate-300 px-2 py-1 font-mono text-xs"
-                    required
-                  />
+                  <label className="space-y-1 text-sm text-slate-700">
+                    <span className="flex items-center gap-2">Nombre <FieldHint text="Nombre visible para consulta y auditoría interna." /></span>
+                    <input name="nombre" defaultValue={rule.nombre} className="rounded-md border border-slate-300 px-2 py-1 text-sm" required />
+                  </label>
+                  <label className="space-y-1 text-sm text-slate-700">
+                    <span className="flex items-center gap-2">Descripción <FieldHint text="Resumen de la hipótesis jurídica de la regla." /></span>
+                    <input
+                      name="descripcion"
+                      defaultValue={rule.descripcion}
+                      className="rounded-md border border-slate-300 px-2 py-1 text-sm"
+                      required
+                    />
+                  </label>
+                  <label className="space-y-1 text-sm text-slate-700">
+                    <span className="flex items-center gap-2">Condición (JSON) <FieldHint text="Estructura lógica evaluada por el motor de reglas." /></span>
+                    <textarea
+                      name="condicion_json"
+                      defaultValue={JSON.stringify(rule.condicion_json)}
+                      className="h-20 rounded-md border border-slate-300 px-2 py-1 font-mono text-xs"
+                      required
+                    />
+                  </label>
                   <div className="grid gap-2 md:grid-cols-3">
-                    <input name="resultado" defaultValue={rule.resultado} className="rounded-md border border-slate-300 px-2 py-1 text-sm" required />
-                    <input name="prioridad" type="number" min={1} defaultValue={rule.prioridad} className="rounded-md border border-slate-300 px-2 py-1 text-sm" required />
-                    <input name="fundamento" defaultValue={rule.fundamento} className="rounded-md border border-slate-300 px-2 py-1 text-sm" required />
+                    <label className="space-y-1 text-sm text-slate-700">
+                      <span className="flex items-center gap-2">Resultado <FieldHint text="Tipo de decisión que sugiere la regla." /></span>
+                      <select name="resultado" defaultValue={rule.resultado} className="rounded-md border border-slate-300 px-2 py-1 text-sm" required>
+                        <option value="auto_admisorio">auto_admisorio</option>
+                        <option value="auto_inadmisorio">auto_inadmisorio</option>
+                        <option value="mandamiento_pago">mandamiento_pago</option>
+                        <option value="auto_rechaza_demanda">auto_rechaza_demanda</option>
+                      </select>
+                    </label>
+                    <label className="space-y-1 text-sm text-slate-700">
+                      <span className="flex items-center gap-2">Prioridad <FieldHint text="1 es la más fuerte y prevalece sobre números mayores." /></span>
+                      <input name="prioridad" type="number" min={1} defaultValue={rule.prioridad} className="rounded-md border border-slate-300 px-2 py-1 text-sm" required />
+                    </label>
+                    <label className="space-y-1 text-sm text-slate-700">
+                      <span className="flex items-center gap-2">Fundamento <FieldHint text="Argumento jurídico que se mostrará como soporte de la sugerencia." /></span>
+                      <input name="fundamento" defaultValue={rule.fundamento} className="rounded-md border border-slate-300 px-2 py-1 text-sm" required />
+                    </label>
                   </div>
                   <div>
                     <button type="submit" className="theme-btn-primary px-3 py-1 text-xs">

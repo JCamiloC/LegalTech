@@ -1,3 +1,8 @@
+# formatos/
+
+La estrategia vigente de plantillas DOCX por tipificación final está definida en:
+
+- `../../DOCUMENTACION_PROYECTO.md`
 # Formatos de respuesta (Word)
 
 Coloca aquí los formatos oficiales en Word para ajustar la salida jurídica.

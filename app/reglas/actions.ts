@@ -7,6 +7,17 @@ import { ensureNonEmpty } from "@/lib/validation/forms";
 import type { RuleCondition } from "@/types";
 import { RuleRepository, RuleService } from "@/modules/rules";
 
+const ALLOWED_RESULTS = [
+  "auto_admisorio",
+  "auto_inadmisorio",
+  "mandamiento_pago",
+  "auto_rechaza_demanda",
+] as const;
+
+function isAllowedDecisionResult(value: string): value is (typeof ALLOWED_RESULTS)[number] {
+  return ALLOWED_RESULTS.includes(value as (typeof ALLOWED_RESULTS)[number]);
+}
+
 function parseConditionJson(raw: string): RuleCondition | null {
   try {
     return JSON.parse(raw) as RuleCondition;
@@ -27,6 +38,14 @@ export async function createRuleAction(formData: FormData) {
 
   if (!nombre || !descripcion || !condicion || !resultado || !fundamento || Number.isNaN(prioridad)) {
     redirect("/reglas?error=Datos%20inv%C3%A1lidos%20para%20crear%20la%20regla");
+  }
+
+  if (!isAllowedDecisionResult(resultado)) {
+    redirect("/reglas?error=Resultado%20de%20regla%20no%20permitido");
+  }
+
+  if (prioridad < 1) {
+    redirect("/reglas?error=La%20prioridad%20debe%20ser%20mayor%20o%20igual%20a%201");
   }
 
   const supabase = await createSupabaseServerClient();
@@ -58,6 +77,14 @@ export async function updateRuleAction(ruleId: string, formData: FormData) {
 
   if (!nombre || !descripcion || !condicion || !resultado || !fundamento || Number.isNaN(prioridad)) {
     redirect("/reglas?error=Datos%20inv%C3%A1lidos%20para%20actualizar%20la%20regla");
+  }
+
+  if (!isAllowedDecisionResult(resultado)) {
+    redirect("/reglas?error=Resultado%20de%20regla%20no%20permitido");
+  }
+
+  if (prioridad < 1) {
+    redirect("/reglas?error=La%20prioridad%20debe%20ser%20mayor%20o%20igual%20a%201");
   }
 
   const supabase = await createSupabaseServerClient();
