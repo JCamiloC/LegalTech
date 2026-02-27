@@ -26,7 +26,7 @@ Para mapearlo rápido al generador, marca secciones claras como:
 
 ## Variables sugeridas
 
-Si quieres, puedes dejar marcadores como estos dentro del texto:
+Si quieres, puedes dejar marcadores como estos dentro del texto:1
 
 - `{{radicado}}`
 - `{{despacho}}`
