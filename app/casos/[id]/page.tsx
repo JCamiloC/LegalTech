@@ -88,9 +88,6 @@ export default async function CasoDetallePage({ params, searchParams }: CasoDeta
           <Link href="/casos" className="rounded-lg border border-slate-300 px-4 py-2 text-sm">
             Volver a casos
           </Link>
-          <Link href={`/asistente?caseId=${id}`} className="rounded-lg border border-slate-300 px-4 py-2 text-sm">
-            Consultar asistente
-          </Link>
           <form action={deleteCase}>
             <button type="submit" className="rounded-lg border border-red-300 px-4 py-2 text-sm text-red-700">
               Eliminar caso
