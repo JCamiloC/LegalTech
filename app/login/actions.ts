@@ -25,7 +25,7 @@ export async function loginAction(formData: FormData) {
     redirect(`/login?error=${encodeURIComponent(error.message)}`);
   }
 
-  redirect("/casos");
+  redirect("/tutelas");
 }
 
 export async function logoutAction() {

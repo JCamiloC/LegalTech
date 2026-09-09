@@ -9,7 +9,9 @@ import {
   deleteCaseAction,
   evaluateCaseAction,
   generateDecisionDocumentAction,
+  generateCorrectionReportAction,
   saveChecklistAction,
+  suggestDecisionAction,
   updateCaseAction,
   saveDecisionAction,
 } from "../actions";
@@ -43,14 +45,37 @@ export default async function CasoDetallePage({ params, searchParams }: CasoDeta
     decisionService.getLatestByCaseId(id),
   ]);
 
+  const latestAiSuggestionResult = await supabase
+    .from("case_ai_suggestions")
+    .select("*")
+    .eq("case_id", id)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const latestAiSuggestion = latestAiSuggestionResult.data as
+    | {
+        decision_sugerida: string;
+        confianza: string;
+        fundamento_json: Array<{ articulo: string; texto_relevante: string }> | null;
+        analisis_checklist: string | null;
+        parte_motiva_borrador: string | null;
+        defectos_json: string[] | null;
+        biblioteca_contexto_json:
+          | Array<{ titulo: string; tipo_documento: string; etiquetas: string[]; score: number }>
+          | null;
+      }
+    | null;
+
   if (!caseRecord) {
     notFound();
   }
 
   const checklistAction = saveChecklistAction.bind(null, id);
   const evaluateAction = evaluateCaseAction.bind(null, id);
+  const suggestDecision = suggestDecisionAction.bind(null, id);
   const saveDecision = saveDecisionAction.bind(null, id);
   const generateDocument = generateDecisionDocumentAction.bind(null, id);
+  const generateCorrectionReport = generateCorrectionReportAction.bind(null, id);
   const updateCase = updateCaseAction.bind(null, id);
   const deleteCase = deleteCaseAction.bind(null, id);
   const hasChecklist = Boolean(checklist);
@@ -149,6 +174,9 @@ export default async function CasoDetallePage({ params, searchParams }: CasoDeta
             <input name="cuantia" defaultValue={caseRecord.cuantia ?? ""} type="number" step="0.01" className="rounded-md border border-slate-300 px-2 py-1 text-sm" />
             <input name="competencia_territorial" defaultValue={caseRecord.competencia_territorial ?? ""} className="rounded-md border border-slate-300 px-2 py-1 text-sm" />
             <input name="despacho" defaultValue={caseRecord.despacho ?? ""} className="rounded-md border border-slate-300 px-2 py-1 text-sm" />
+            <input name="fecha_demanda" defaultValue={caseRecord.fecha_demanda ?? ""} type="date" className="rounded-md border border-slate-300 px-2 py-1 text-sm" />
+            <textarea name="pretensiones_resumen" defaultValue={caseRecord.pretensiones_resumen ?? ""} className="rounded-md border border-slate-300 px-2 py-1 text-sm" />
+            <textarea name="hechos_resumen" defaultValue={caseRecord.hechos_resumen ?? ""} className="rounded-md border border-slate-300 px-2 py-1 text-sm" />
             <div>
               <button type="submit" className="rounded-md border border-slate-300 px-3 py-1 text-xs">
                 Guardar datos del caso
@@ -267,6 +295,88 @@ export default async function CasoDetallePage({ params, searchParams }: CasoDeta
         <details open={isReview}>
           <summary className="cursor-pointer text-lg font-semibold text-slate-900">Decisión final</summary>
 
+          <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-3">
+            <p className="text-sm font-medium text-slate-900">Sugerencia de decisión con IA</p>
+            <p className="mt-1 text-xs text-slate-600">
+              Usa checklist, reglas activas, base legal y casos similares del histórico.
+            </p>
+            <form action={suggestDecision} className="mt-3">
+              <button
+                type="submit"
+                disabled={!hasChecklist}
+                className="rounded-lg border border-slate-300 px-4 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-50"
+                title={!hasChecklist ? "Primero guarda checklist" : "Ejecutar análisis IA"}
+              >
+                Analizar con IA
+              </button>
+            </form>
+
+            {latestAiSuggestion ? (
+              <div className="mt-4 space-y-3 text-sm">
+                <p>
+                  <span className="font-medium text-slate-900">Decisión sugerida:</span>{" "}
+                  <span className="text-slate-700">{latestAiSuggestion.decision_sugerida}</span>
+                </p>
+                <p>
+                  <span className="font-medium text-slate-900">Confianza:</span>{" "}
+                  <span
+                    className={`rounded-md px-2 py-0.5 text-xs font-medium ${
+                      latestAiSuggestion.confianza === "alto"
+                        ? "bg-emerald-100 text-emerald-700"
+                        : latestAiSuggestion.confianza === "medio"
+                          ? "bg-amber-100 text-amber-700"
+                          : "bg-rose-100 text-rose-700"
+                    }`}
+                  >
+                    {latestAiSuggestion.confianza}
+                  </span>
+                </p>
+                {latestAiSuggestion.fundamento_json && latestAiSuggestion.fundamento_json.length > 0 ? (
+                  <div>
+                    <p className="font-medium text-slate-900">Fundamento normativo</p>
+                    <ul className="mt-1 space-y-1 text-slate-700">
+                      {latestAiSuggestion.fundamento_json.map((item, index) => (
+                        <li key={`${item.articulo}-${index}`}>
+                          {item.articulo}: {item.texto_relevante}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null}
+                {latestAiSuggestion.defectos_json && latestAiSuggestion.defectos_json.length > 0 ? (
+                  <div>
+                    <p className="font-medium text-slate-900">Defectos identificados</p>
+                    <ul className="mt-1 space-y-1 text-slate-700">
+                      {latestAiSuggestion.defectos_json.map((item, index) => (
+                        <li key={`${item}-${index}`}>- {item}</li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null}
+                {latestAiSuggestion.biblioteca_contexto_json && latestAiSuggestion.biblioteca_contexto_json.length > 0 ? (
+                  <div>
+                    <p className="font-medium text-slate-900">Trazabilidad de biblioteca usada</p>
+                    <ul className="mt-1 space-y-2 text-slate-700">
+                      {latestAiSuggestion.biblioteca_contexto_json.map((item, index) => (
+                        <li key={`${item.titulo}-${index}`} className="rounded-md border border-slate-200 bg-white px-2 py-1">
+                          <p className="text-sm font-medium text-slate-900">{item.titulo}</p>
+                          <p className="text-xs text-slate-600">
+                            {item.tipo_documento} · score {item.score}
+                          </p>
+                          {item.etiquetas.length > 0 ? (
+                            <p className="text-xs text-slate-500">Etiquetas: {item.etiquetas.join(", ")}</p>
+                          ) : null}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null}
+              </div>
+            ) : (
+              <p className="mt-3 text-xs text-slate-500">Aún no hay sugerencia de IA para este caso.</p>
+            )}
+          </div>
+
           <form action={saveDecision} className="mt-4 grid gap-3">
           <label className="text-sm text-slate-700">
             Tipo de decisión
@@ -301,6 +411,15 @@ export default async function CasoDetallePage({ params, searchParams }: CasoDeta
           </label>
 
           <label className="text-sm text-slate-700">
+            Parte motiva (borrador IA editable)
+            <textarea
+              name="parte_motiva_borrador"
+              defaultValue={caseRecord.parte_motiva_borrador ?? latestAiSuggestion?.parte_motiva_borrador ?? ""}
+              className="mt-1 h-36 w-full rounded-lg border border-slate-300 p-2"
+            />
+          </label>
+
+          <label className="text-sm text-slate-700">
             Artículos aplicados
             <textarea
               name="articulos_aplicados"
@@ -328,6 +447,19 @@ export default async function CasoDetallePage({ params, searchParams }: CasoDeta
         <details open={isDecided}>
           <summary className="cursor-pointer text-lg font-semibold text-slate-900">Documento final</summary>
 
+          <div className="mt-3 grid gap-2">
+            {!caseRecord.parte_motiva_borrador ? (
+              <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                Advertencia: falta parte motiva borrador.
+              </p>
+            ) : null}
+            {!caseRecord.pretensiones_resumen ? (
+              <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                Advertencia: falta pretensiones_resumen.
+              </p>
+            ) : null}
+          </div>
+
           <div className="mt-3 flex flex-wrap gap-2">
             <form action={generateDocument}>
               <button
@@ -341,6 +473,20 @@ export default async function CasoDetallePage({ params, searchParams }: CasoDeta
                 }
               >
                 Generar y descargar DOCX
+              </button>
+            </form>
+            <form action={generateCorrectionReport}>
+              <button
+                type="submit"
+                disabled={!isReview && !isDecided}
+                className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-2 text-sm text-amber-800 disabled:cursor-not-allowed disabled:opacity-50"
+                title={
+                  isReview || isDecided
+                    ? "Genera acta de correcciones con defectos identificados"
+                    : "Disponible cuando el caso esté en revisión o decidido"
+                }
+              >
+                Generar acta de correcciones
               </button>
             </form>
             <Link href={`/documentos/preview?caseId=${id}&source=word`} className="rounded-lg border border-slate-300 px-4 py-2 text-sm">

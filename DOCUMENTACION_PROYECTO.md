@@ -1,136 +1,185 @@
-# DOCUMENTACION MAESTRA - REINICIO MVP LEGALTECH
+# DOCUMENTACIÓN MAESTRA — Asistente de tutelas
 
-Este documento redefine el proyecto para enfocarlo en un MVP funcional, estable y usable por una abogada de pruebas, sin depender de IA en la fase actual.
+Referencia técnica consolidada. La visión de producto está en `docs/VISION_TUTELAS.md`.
+
+---
 
 ## 1) Objetivo del producto
 
-Entregar un sistema de apoyo juridico que minimiza el trabajo manual de la abogada en tres puntos clave:
+Asistir al abogado del despacho judicial en el trámite de **acciones de tutela**:
 
-1. **Extraccion automatica desde PDF:** el LLM lee la demanda y rellena el formulario del caso, sin importar el formato del abogado que la envio.
-2. **Sugerencia de decision juridica:** el LLM analiza el caso con checklist + reglas + historico y propone la decision con fundamento normativo.
-3. **Generacion de DOCX:** el sistema genera el documento de respuesta listo para revision y firma.
+1. **Capturar contexto** desde PDFs tal como llegaron al juzgado.
+2. **Prellenar un formulario editable** con extracción híbrida (reglas + IA).
+3. **Conversar con un asistente** para analizar admisión/rechazo con base en la biblioteca normativa.
+4. **Generar un borrador Word** con el formato del despacho para revisión final.
 
-La decision final siempre la toma la abogada.
+La decisión jurídica definitiva es siempre del abogado.
 
-### Flujo completo:
+---
+
+## 2) Flujo de usuario
 
 ```
-PDF demanda -> LLM extrae campos -> Formulario prellenado -> Checklist
--> LLM sugiere decision -> Abogada confirma -> DOCX generado
+/login → /tutelas → /tutelas/nueva
+                          │
+          ┌───────────────┴───────────────┐
+          │ Pestaña 1: Contexto         │
+          │  • Subir PDFs                 │
+          │  • Ver/editar pre-formulario  │
+          └───────────────┬───────────────┘
+                          │
+          ┌───────────────┴───────────────┐
+          │ Pestaña 2: Decisión           │
+          │  • Chat con asistente IA      │
+          │  • Consenso de veredicto      │
+          │  • Generar borrador DOCX      │
+          └───────────────────────────────┘
+
+/biblioteca (aparte) — normas, decretos, jurisprudencia
 ```
 
 ---
 
-## 2) Core del aplicativo (lo que SI se usa)
+## 3) Estrategia de extracción PDF
 
-- Autenticacion y rutas privadas.
-- Gestion de casos (`/casos`).
-- **Ingesta de PDF con extraccion LLM** (reemplaza regex).
-- Checklist procesal.
-- **Sugerencia de decision por LLM** + reglas + historico.
-- Plantillas por tipo de decision.
-- Generacion y descarga de DOCX final.
-- Auditoria de eventos del caso.
-
-**Stack IA local:**
-- Runtime: Ollama (gratuito, open-source).
-- Modelo: `qwen2.5:14b-instruct-q4_K_M` (o `7b` en maquinas con menos RAM).
-- Un modelo, dos prompts especializados (extraccion y analisis).
-- Costo total: $0. Solo electricidad local.
-
----
-
-## 3) Estrategia IA: un modelo, dos prompts
-
-No se usan dos modelos separados. Eso duplicaria el consumo de RAM.
-
-- **Prompt 1 — Extraccion:** recibe texto OCR del PDF, devuelve campos estructurados del caso en JSON.
-- **Prompt 2 — Analisis:** recibe datos del caso + checklist + reglas + historico, devuelve decision sugerida con fundamento.
-
-El mismo modelo Qwen 2.5 cubre ambas tareas con calidad suficiente para este dominio.
-
----
-
-## 4) Arquitectura tecnica
-
-### Extraccion desde PDF (Sprint 1)
+### Pipeline híbrido (recomendado)
 
 ```
-PDF -> OCR (pdf-parse, ya existe) -> texto crudo
-    -> LlmExtractionService (Ollama) -> JSON validado
-    -> Formulario prellenado con indicador de confianza por campo
-    -> Fallback a regex si LLM no disponible
+PDF → Parseo (pdf-parse / Docling) → Texto por documento
+    → Heurísticas (regex) → radicado, fechas, IDs
+    → LLM (JSON) → hechos, pretensiones, derechos, partes
+    → Formulario con confianza + evidencia por campo
+    → Abogado corrige
 ```
 
-### Sugerencia de decision (Sprint 2)
+**No usar solo regex** (formatos variables). **No usar solo LLM** (alucinaciones, costo). El código en `src/modules/llm/extraction.service.ts` ya implementa este patrón; debe adaptarse al schema de tutela.
+
+### Campos críticos tutela
+
+- Accionante, accionados, derechos invocados, pretensiones, hechos resumidos, radicado
+
+---
+
+## 4) Estrategia Word (DOCX)
 
 ```
-Caso guardado + checklist completado
-    -> LlmDecisionService (Ollama)
-       + reglas activas
-       + hasta 10 casos historicos similares
-    -> Decision sugerida + fundamento normativo + confianza
-    -> Abogada confirma o ajusta
-    -> Se guarda decision final + registro de si la IA acierto
+Veredicto + contexto → LLM genera JSON de redacción
+                     → docxtemplater rellena plantilla .docx del juzgado
+                     → Descarga borrador
 ```
 
-### Aprendizaje incremental
-
-- Cada decision final queda almacenada.
-- El historico alimenta el contexto del siguiente caso.
-- No se necesita vector DB ni embeddings para el MVP.
-- Simple recuperacion por tipo_proceso + resultado.
+- **docxtemplater:** producción (preserva formato judicial)
+- **mammoth:** leer tutelas previas como referencia de estilo
+- **docx (actual):** deprecar para respuestas finales — solo genera texto plano
 
 ---
 
-## 5) Paso a paso de ejecucion (Sprints)
+## 5) Stack técnico
 
-**Sprint 0 (1 dia):** instalar Ollama + descargar modelo + configurar variables.
-
-**Sprint 1 (3-4 dias):** LLM extrae campos desde demanda PDF.
-
-**Sprint 2 (3-4 dias):** LLM sugiere decision juridica con fundamento.
-
-**Sprint 3 (2-3 dias):** plantillas DOCX con todos los campos nuevos.
-
-**Sprint 4 (2 dias):** historico, metricas de precision, casos similares.
-
-Detalle completo: `docs/PLAN_REINICIO_MVP_LOCAL.md`
-
----
-
-## 6) Costos
-
-| Componente | Costo |
-|---|---|
-| Ollama (runtime LLM) | $0 — open source |
-| Qwen 2.5 (modelo) | $0 — open weights |
-| Maquina local de pruebas | $0 — hardware propio |
-| Supabase free tier | $0 hasta 500MB |
-| **MVP local total** | **$0** |
-
-Si en el futuro se despliega en nube: Azure VM Standard_D4s_v5 ~$150 USD/mes.
+| Capa | Tecnología |
+|------|------------|
+| Frontend | Next.js App Router, React |
+| Backend | Next.js API routes, Server Actions |
+| Base de datos | Supabase (PostgreSQL) |
+| Auth | Supabase Auth |
+| PDF | pdf-parse (+ OCR fallback; Docling en roadmap) |
+| IA extracción + chat | Ollama (local) o Gemini/GPT (API) |
+| Word | docxtemplater (por implementar) |
+| Biblioteca | Texto + chunks para RAG |
 
 ---
 
-## 7) Despliegue
+## 6) Módulos del código (mapeo)
 
-- MVP: local en maquina de la abogada (Ollama + Next.js dev build).
-- No requiere cloud para funcionar.
-- Cloud se evalua al estabilizar el producto.
-
----
-
-## 8) Criterio de exito del MVP
-
-1. Cargar una demanda PDF y ver el formulario prellenado en menos de 30 segundos.
-2. El sistema sugiere la decision juridica con fundamento normativo.
-3. La abogada solo ajusta detalles, no rellena todo desde cero.
-4. El DOCX generado no requiere correcciones manuales de datos.
+| Módulo actual | Uso en tutelas v1 |
+|---------------|-------------------|
+| `src/modules/llm/extraction.service.ts` | Adaptar schema tutela |
+| `src/modules/llm/decision.service.ts` | Evolucionar a chat |
+| `src/modules/knowledge/` | Biblioteca + RAG |
+| `src/modules/documents/` | Migrar a docxtemplater |
+| `app/casos/` | Renombrar → `app/tutelas/` |
+| `app/biblioteca/` | Mantener |
 
 ---
 
-## 9) Regla de documentacion
+## 7) Modelo de datos (simplificado tutela)
 
-Este archivo es la unica fuente oficial vigente.
-Detalle de sprints e implementacion: `docs/PLAN_REINICIO_MVP_LOCAL.md`
+### `tutelas`
+
+- id, radicado, estado (borrador | en_analisis | resuelta)
+- accionante_json, accionados_json
+- hechos, pretensiones, derechos_invocados
+- medida_provisional, checklist_json
+- veredicto_confirmado, fundamento_final
+- created_at, updated_at, user_id
+
+### `tutela_documents`
+
+- tutela_id, filename, storage_path, extracted_text, page_count
+
+### `tutela_messages`
+
+- tutela_id, role (user | assistant), content, sources_json, created_at
+
+### `knowledge_documents` (biblioteca)
+
+- titulo, tipo, contenido_texto, etiquetas, file_path
+
+---
+
+## 8) IA — configuración
+
+Ver decisiones completas en `docs/PLAN_IA_Y_AGENTE.md`.
+
+### Producción (recomendado)
+
+| Tarea | Modelo |
+|-------|--------|
+| Extracción PDF | Gemini 2.5 Flash |
+| Chat decisión + redacción | Claude Sonnet 4 |
+| Reintento JSON estricto | GPT-4o-mini (opcional) |
+
+### Fallback / desarrollo
+
+- Ollama: `qwen2.5:14b-instruct-q4_K_M`
+- Variables: `OLLAMA_BASE_URL`, `LEGAL_LLM_FALLBACK_PROVIDER=ollama`
+
+### Costo estimado
+
+~$0.25–0.35 USD por tutela completa (~100 tutelas/mes ≈ $30/mes).
+
+---
+
+## 9) Despliegue local
+
+```bash
+cp .env.example .env.local
+# Configurar Supabase + Ollama
+npm install
+npm run dev
+```
+
+Ollama:
+
+```bash
+ollama pull qwen2.5:14b-instruct-q4_K_M
+ollama serve
+```
+
+---
+
+## 10) Documentos relacionados
+
+- `docs/VISION_TUTELAS.md` — visión y análisis PDF/Word
+- `docs/ROADMAP_TUTELAS.md` — fases de implementación
+- `docs/PLAN_IA_Y_AGENTE.md` — IA, agente, plantilla al final del chat
+- `docs/MATRIZ_EVALUACION_PRECISION_CASOS.md` — QA
+
+---
+
+## 11) Lo que quedó fuera de alcance (v1)
+
+- Calificación de demandas ejecutivas/verbales/ordinarias
+- Perfiles por cargo (juez, secretario, escribiente)
+- Checklist configurable multi-proceso
+- Integración con sistemas Rama Judicial

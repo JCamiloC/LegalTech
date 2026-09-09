@@ -1,5 +1,12 @@
 # Roadmap completo — LegalTech MVP con IA local
 
+> **Documento histórico.** Roadmap vigente: [ROADMAP_TUTELAS.md](./ROADMAP_TUTELAS.md).
+> Visión de producto: [VISION_TUTELAS.md](./VISION_TUTELAS.md).
+
+---
+
+# Roadmap completo — LegalTech MVP con IA local
+
 **Este documento es autocontenido. Si lees esto en una maquina nueva sin contexto previo, tiene todo lo necesario para entender el proyecto, el estado actual del codigo y como implementar cada sprint.**
 
 

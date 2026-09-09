@@ -12,7 +12,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "node scripts/start.mjs",
-    "lint": "next lint"
+    "lint": "next lint",
+    "test:gemini": "node scripts/test-gemini.mjs",
+    "seed:demo-user": "node scripts/create-demo-user.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.6.0",

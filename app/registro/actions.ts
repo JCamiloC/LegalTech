@@ -33,7 +33,7 @@ export async function registerAction(formData: FormData) {
   }
 
   if (data.user) {
-    redirect("/casos");
+    redirect("/tutelas");
   }
 
   redirect("/login?ok=Usuario%20creado.%20Revisa%20tu%20correo%20si%20la%20confirmaci%C3%B3n%20est%C3%A1%20habilitada.");

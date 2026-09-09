@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 
-const PRIVATE_ROUTES = ["/casos", "/documentos", "/reglas", "/plantillas", "/articulos"];
+const PRIVATE_ROUTES = ["/tutelas", "/casos", "/biblioteca", "/documentos"];
 
 export async function proxy(request: NextRequest) {
   const response = NextResponse.next();
@@ -30,7 +30,7 @@ export async function proxy(request: NextRequest) {
   const isPrivateRoute = PRIVATE_ROUTES.some((route) => pathname === route || pathname.startsWith(`${route}/`));
 
   if (pathname === "/login" && user) {
-    return NextResponse.redirect(new URL("/casos", request.url));
+    return NextResponse.redirect(new URL("/tutelas", request.url));
   }
 
   if (isPrivateRoute && !user) {
@@ -41,5 +41,5 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
+  matcher: ["/((?!api|_next/static|_next/image|favicon.ico).*)"],
 };

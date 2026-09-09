@@ -12,11 +12,15 @@ import type {
 import { CaseRepository } from "@/modules/cases/case.repository";
 import { RuleRepository } from "./rule.repository";
 
-type EvaluationContext = Record<string, string | number | boolean | null | undefined>;
+type EvaluationContext = Record<string, unknown>;
 
 interface RuleEngineDependencies {
   caseRepository: CaseRepository;
   ruleRepository: RuleRepository;
+}
+
+interface EvaluateCaseOptions {
+  checklistLabels?: Array<{ key: string; label: string }>;
 }
 
 const DEFAULT_DECISION: DecisionType = "auto_inadmisorio";
@@ -171,8 +175,11 @@ function toEvaluation(rule: RuleDefinitionRecord, matched: boolean): RuleEvaluat
   };
 }
 
-function getChecklistMissingItems(context: EvaluationContext): string[] {
-  const fields: Array<{ key: string; label: string }> = [
+function getChecklistMissingItems(
+  context: EvaluationContext,
+  configuredFields?: Array<{ key: string; label: string }>
+): string[] {
+  const defaultFields: Array<{ key: string; label: string }> = [
     { key: "cumple_art_82", label: "Cumplimiento del artículo 82" },
     { key: "anexos_completos", label: "Anexos completos" },
     { key: "poder_aportado", label: "Poder aportado" },
@@ -184,6 +191,8 @@ function getChecklistMissingItems(context: EvaluationContext): string[] {
     { key: "prescripcion", label: "Ausencia de prescripción" },
   ];
 
+  const fields = configuredFields && configuredFields.length > 0 ? configuredFields : defaultFields;
+
   return fields.filter((item) => context[item.key] === false).map((item) => item.label);
 }
 
@@ -194,6 +203,7 @@ function buildStandardArgument(params: {
   context: EvaluationContext;
   evaluations: RuleEvaluationResult[];
   defaultFundamento: string;
+  checklistLabels?: Array<{ key: string; label: string }>;
 }): {
   resumen: string;
   hechosRelevantes: string[];
@@ -201,10 +211,10 @@ function buildStandardArgument(params: {
   conclusion: string;
   argumentoEstandar: string;
 } {
-  const { caseRecord, selectedRule, decision, context, evaluations, defaultFundamento } = params;
+  const { caseRecord, selectedRule, decision, context, evaluations, defaultFundamento, checklistLabels } = params;
 
   const matchedRules = evaluations.filter((item) => item.matched);
-  const missingChecklist = getChecklistMissingItems(context);
+  const missingChecklist = getChecklistMissingItems(context, checklistLabels);
 
   const hechosRelevantes = [
     `Radicado: ${caseRecord.radicado}.`,
@@ -261,7 +271,11 @@ async function getDependencies(supabase?: SupabaseClient): Promise<RuleEngineDep
   };
 }
 
-export async function evaluateCase(caseId: string, supabase?: SupabaseClient): Promise<DecisionSuggestion> {
+export async function evaluateCase(
+  caseId: string,
+  supabase?: SupabaseClient,
+  options?: EvaluateCaseOptions
+): Promise<DecisionSuggestion> {
   const dependencies = await getDependencies(supabase);
 
   const [caseRecord, checklist, rules] = await Promise.all([
@@ -314,6 +328,7 @@ export async function evaluateCase(caseId: string, supabase?: SupabaseClient): P
       context,
       evaluations,
       defaultFundamento: "No se activó regla concluyente. Requiere valoración del operador jurídico.",
+      checklistLabels: options?.checklistLabels,
     });
 
     return {
@@ -338,6 +353,7 @@ export async function evaluateCase(caseId: string, supabase?: SupabaseClient): P
     context,
     evaluations,
     defaultFundamento: matchedRule.fundamento,
+    checklistLabels: options?.checklistLabels,
   });
 
   return {

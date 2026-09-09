@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 
 interface FeedbackToastProps {
   message?: string;
-  tone?: "success" | "error";
+  tone?: "success" | "error" | "warning";
   durationMs?: number;
 }
 
@@ -38,7 +38,9 @@ export default function FeedbackToast({
         className={`rounded-lg border px-4 py-3 text-sm shadow-lg ${
           tone === "success"
             ? "border-emerald-300 bg-emerald-50 text-emerald-800"
-            : "border-rose-300 bg-rose-50 text-rose-800"
+            : tone === "warning"
+              ? "border-amber-300 bg-amber-50 text-amber-800"
+              : "border-rose-300 bg-rose-50 text-rose-800"
         }`}
       >
         <div className="flex items-start justify-between gap-3">

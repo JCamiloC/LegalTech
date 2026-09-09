@@ -5,6 +5,7 @@ import { DecisionRepository, DecisionService } from "@/modules/decisions";
 import {
   buildDocumentPreview,
   buildInstitutionalTemplateHtml,
+  normalizeDecisionType,
   TemplateRepository,
 } from "@/modules/documents";
 
@@ -17,6 +18,62 @@ const DEFAULT_TEMPLATE = `<h1>{{despacho}}</h1>
 
 interface DocumentPreviewPageProps {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
+}
+
+interface ProfileTemplateRow {
+  titulo: string;
+  contenido_texto: string | null;
+  decision_type_normalized: string | null;
+  decision_type_alias: string | null;
+  metadata_json: Record<string, unknown>;
+  updated_at: string;
+}
+
+function parseDecisionTypeFromMetadata(metadata: Record<string, unknown>): string {
+  return normalizeDecisionType(String(metadata.tipo_decision ?? "general")).normalized;
+}
+
+async function resolveProfileStrictTemplate(params: {
+  profileId: string | null;
+  decisionType: string;
+  supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>;
+}): Promise<string | null> {
+  if (!params.profileId) {
+    return null;
+  }
+
+  const result = await params.supabase
+    .from("knowledge_documents")
+    .select("titulo,contenido_texto,decision_type_normalized,decision_type_alias,metadata_json,updated_at")
+    .eq("profile_id", params.profileId)
+    .eq("tipo_documento", "plantilla_legal")
+    .eq("activo", true)
+    .order("updated_at", { ascending: false })
+    .limit(50);
+
+  const candidates = ((result.data ?? []) as ProfileTemplateRow[]).filter(
+    (item) => String(item.contenido_texto ?? "").trim().length > 0
+  );
+
+  if (candidates.length === 0) {
+    return null;
+  }
+
+  const exact = candidates.find(
+    (item) => {
+      const rowDecision = normalizeDecisionType(
+        item.decision_type_normalized ?? item.decision_type_alias ?? parseDecisionTypeFromMetadata(item.metadata_json)
+      ).normalized;
+      return rowDecision === normalizeDecisionType(params.decisionType).normalized;
+    }
+  );
+  const general = candidates.find((item) => {
+    const rowDecision = normalizeDecisionType(
+      item.decision_type_normalized ?? item.decision_type_alias ?? parseDecisionTypeFromMetadata(item.metadata_json)
+    ).normalized;
+    return rowDecision === "general";
+  });
+  return String((exact ?? general ?? candidates[0]).contenido_texto ?? "");
 }
 
 export default async function DocumentPreviewPage({ searchParams }: DocumentPreviewPageProps) {
@@ -54,6 +111,20 @@ export default async function DocumentPreviewPage({ searchParams }: DocumentPrev
     decisionService.getLatestByCaseId(caseId),
   ]);
 
+  const latestSuggestionResult = await supabase
+    .from("case_ai_suggestions")
+    .select("fundamento_json,defectos_json")
+    .eq("case_id", caseId)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const latestSuggestion = latestSuggestionResult.data as
+    | {
+        fundamento_json: Array<{ articulo: string; texto_relevante: string }> | null;
+        defectos_json: string[] | null;
+      }
+    | null;
+
   if (!caseRecord || !decision) {
     return (
       <main className="mx-auto min-h-screen w-full max-w-4xl px-6 py-10">
@@ -80,16 +151,28 @@ export default async function DocumentPreviewPage({ searchParams }: DocumentPrev
         })
       : null;
 
+  const profileTemplate = await resolveProfileStrictTemplate({
+    profileId: caseRecord.profile_id,
+    decisionType: decision.tipo_decision,
+    supabase,
+  });
   const template = await templateRepository.findActiveByDecision(decision.tipo_decision);
   const preview =
-    institutionalPreview ??
-    buildDocumentPreview(template?.contenido_html ?? DEFAULT_TEMPLATE, {
+    buildDocumentPreview(profileTemplate ?? institutionalPreview ?? template?.contenido_html ?? DEFAULT_TEMPLATE, {
       radicado: caseRecord.radicado,
       despacho: caseRecord.despacho ?? "Despacho por definir",
       demandante: caseRecord.demandante_nombre,
       demandado: caseRecord.demandado_nombre,
       fundamento: decision.fundamento_juridico,
       decision: decision.tipo_decision,
+      pretensiones_resumen: caseRecord.pretensiones_resumen ?? "",
+      hechos_resumen: caseRecord.hechos_resumen ?? "",
+      fecha_demanda: caseRecord.fecha_demanda ?? "",
+      parte_motiva: caseRecord.parte_motiva_borrador ?? "",
+      defectos_identificados: (latestSuggestion?.defectos_json ?? []).join("; "),
+      fundamento_normativo: (latestSuggestion?.fundamento_json ?? [])
+        .map((item) => `${item.articulo}: ${item.texto_relevante}`)
+        .join("\n"),
     });
 
   return (

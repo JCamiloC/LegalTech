@@ -1,4 +1,4 @@
-import { renderTemplate, type TemplateVariables } from "./template.service";
+import { renderTemplate, renderTemplateStrict, type TemplateVariables } from "./template.service";
 import { Document, Packer, Paragraph, TextRun } from "docx";
 
 export function buildDocumentPreview(template: string, variables: TemplateVariables): string {
@@ -27,8 +27,22 @@ function htmlToPlainText(html: string): string {
     .trim();
 }
 
-export async function createDocxBufferFromTemplate(template: string, variables: TemplateVariables): Promise<Buffer> {
-  const renderedHtml = renderTemplate(template, variables);
+export async function createDocxBufferFromTemplate(
+  template: string,
+  variables: TemplateVariables,
+  options?: { strict?: boolean }
+): Promise<Buffer> {
+  const strict = options?.strict ?? false;
+  const renderedHtml = strict
+    ? (() => {
+        const result = renderTemplateStrict(template, variables);
+        if (result.unresolved.length > 0) {
+          throw new Error(`Plantilla incompleta. Variables no resueltas: ${result.unresolved.join(", ")}`);
+        }
+
+        return result.rendered;
+      })()
+    : renderTemplate(template, variables);
   const plainText = htmlToPlainText(renderedHtml);
 
   const paragraphs = plainText.split("\n").map((line) => {

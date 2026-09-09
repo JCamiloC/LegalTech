@@ -1,5 +1,7 @@
 # Documento histórico
 
-La visión actual del asistente legal (LLM especializado, biblioteca jurídica, memoria por abogado y cierre DOCX por tipificación) está consolidada en:
+La visión actual del producto (flujo único de tutelas) está en:
 
-- `../DOCUMENTACION_PROYECTO.md`
+- [VISION_TUTELAS.md](./VISION_TUTELAS.md)
+- [ROADMAP_TUTELAS.md](./ROADMAP_TUTELAS.md)
+- [../DOCUMENTACION_PROYECTO.md](../DOCUMENTACION_PROYECTO.md)

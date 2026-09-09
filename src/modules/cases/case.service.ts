@@ -2,6 +2,7 @@ import { CaseRepository } from "./case.repository";
 import type { DecisionType } from "@/types";
 
 interface CreateCasePayload {
+  profile_id?: string | null;
   radicado: string;
   demandante_nombre: string;
   demandado_nombre: string;
@@ -10,6 +11,11 @@ interface CreateCasePayload {
   cuantia?: number | null;
   competencia_territorial?: string | null;
   despacho?: string | null;
+  pretensiones_resumen?: string | null;
+  hechos_resumen?: string | null;
+  fecha_demanda?: string | null;
+  llm_extraccion_json?: Record<string, unknown> | null;
+  llm_confianza_promedio?: "alto" | "medio" | "bajo" | null;
 }
 
 interface ChecklistPayload {

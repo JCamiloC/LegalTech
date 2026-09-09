@@ -18,9 +18,9 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
       <FeedbackToast message={error} tone="error" />
       <FeedbackToast message={ok} tone="success" />
       <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-        <h1 className="text-2xl font-semibold text-slate-900">Ingreso al sistema</h1>
+        <h1 className="text-2xl font-semibold text-slate-900">Asistente de tutelas</h1>
         <p className="mt-2 text-sm text-slate-600">
-          Plataforma de apoyo para calificación de demandas civiles municipales.
+          Apoyo para analizar tutelas, fundamentar decisiones y generar borradores de respuesta.
         </p>
 
         <form action={loginAction} className="mt-6 space-y-4">

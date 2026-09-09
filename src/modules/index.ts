@@ -3,5 +3,7 @@ export * as DecisionsModule from "./decisions";
 export * as RulesModule from "./rules";
 export * as DocumentsModule from "./documents";
 export * as LegalModule from "./legal";
+export * as KnowledgeModule from "./knowledge";
 export * as AuthModule from "./auth";
 export * as AuditModule from "./audit";
+export * as LlmModule from "./llm";
