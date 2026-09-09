@@ -4,11 +4,11 @@
 
 :root {
   color-scheme: light;
-  --color-body-bg: #f8fafc;
-  --color-selection: #cbd5e1;
+  --color-body-bg: #f6f4ef;
+  --color-selection: #c4b5a5;
 
-  --color-primary: #4f46e5;
-  --color-primary-hover: #4338ca;
+  --color-primary: #111827;
+  --color-primary-hover: #030712;
   --color-primary-soft: #eef2ff;
   --color-primary-border: #c7d2fe;
   --color-primary-text: #312e81;
@@ -43,7 +43,7 @@ body {
   .theme-btn-primary {
     background-color: var(--color-primary);
     color: white;
-    @apply rounded-lg px-4 py-2 text-sm font-medium transition;
+    @apply rounded-full px-5 py-2.5 text-sm font-medium shadow-sm transition;
   }
 
   .theme-btn-primary:hover {

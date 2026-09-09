@@ -68,3 +68,49 @@ export async function createDocxBufferFromTemplate(
   const arrayBuffer = await Packer.toBuffer(document);
   return Buffer.from(arrayBuffer);
 }
+
+export async function createDocxBufferFromPlainText(title: string, body: string): Promise<Buffer> {
+  const lines = body.replace(/\r/g, "\n").split("\n");
+  const paragraphs = [
+    new Paragraph({
+      spacing: { after: 240 },
+      children: [
+        new TextRun({
+          text: title,
+          bold: true,
+          size: 28,
+          font: "Times New Roman",
+        }),
+      ],
+    }),
+    ...lines.map(
+      (line) =>
+        new Paragraph({
+          spacing: { after: 120 },
+          children: [
+            new TextRun({
+              text: line.trim().length > 0 ? line : " ",
+              size: 24,
+              font: "Times New Roman",
+            }),
+          ],
+        })
+    ),
+  ];
+
+  const document = new Document({
+    sections: [
+      {
+        properties: {
+          page: {
+            margin: { top: 1134, bottom: 1134, left: 1134, right: 1134 },
+          },
+        },
+        children: paragraphs,
+      },
+    ],
+  });
+
+  const arrayBuffer = await Packer.toBuffer(document);
+  return Buffer.from(arrayBuffer);
+}

@@ -2,11 +2,16 @@ import Link from "next/link";
 import AppShell from "@/components/AppShell";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { CaseRepository, CaseService } from "@/modules/cases";
+import { readTutelaFlow } from "@/modules/llm";
 
-function getStatusLabel(estado: string) {
-  if (estado === "pendiente") return { label: "En contexto", className: "bg-amber-50 text-amber-800 border-amber-200" };
-  if (estado === "en_revision") return { label: "En decisión", className: "bg-blue-50 text-blue-800 border-blue-200" };
-  return { label: "Resuelta", className: "bg-emerald-50 text-emerald-800 border-emerald-200" };
+function getProgress(estado: string, confirmed: boolean) {
+  if (confirmed || estado === "decidido") {
+    return { label: "Lista para Word", hint: "Generar borrador", className: "bg-emerald-100 text-emerald-800" };
+  }
+  if (estado === "en_revision") {
+    return { label: "En decisión", hint: "Continuar el chat", className: "bg-slate-900 text-white" };
+  }
+  return { label: "Por revisar", hint: "Abrir análisis", className: "bg-amber-100 text-amber-900" };
 }
 
 export default async function TutelasPage() {
@@ -15,45 +20,49 @@ export default async function TutelasPage() {
 
   return (
     <AppShell
-      title="Mis tutelas"
-      subtitle="Carga el expediente, revisa el contexto, conversa con el asistente y genera el borrador de respuesta."
+      title="Tutelas"
+      subtitle="Un flujo: cargar, decidir, redactar. La IA propone; tú confirmas."
       action={
         <Link href="/tutelas/nueva" className="theme-btn-primary">
-          + Nueva tutela
+          Nueva tutela
         </Link>
       }
     >
       {cases.length === 0 ? (
-        <section className="rounded-xl border border-dashed border-slate-300 bg-white p-10 text-center">
-          <p className="text-base font-medium text-slate-900">Aún no tienes tutelas</p>
-          <p className="mt-2 text-sm text-slate-600">
-            Comienza cargando los PDFs tal como llegaron al juzgado. El sistema extraerá el contexto y podrás completarlo.
+        <section className="rounded-3xl border border-stone-200 bg-white p-10 shadow-sm sm:p-14">
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-stone-400">Empezar</p>
+          <h2 className="mt-3 text-2xl font-semibold tracking-tight">Aún no hay tutelas en el despacho</h2>
+          <p className="mt-3 max-w-lg text-sm leading-6 text-slate-600">
+            Carga los PDF tal como llegaron. Revisas el contexto, conversas el veredicto y bajas un Word con el formato del juez.
           </p>
-          <Link href="/tutelas/nueva" className="theme-btn-primary mt-6 inline-block">
-            Crear primera tutela
+          <Link href="/tutelas/nueva" className="theme-btn-primary mt-8 inline-flex">
+            Crear la primera
           </Link>
         </section>
       ) : (
-        <section className="rounded-xl border border-slate-200 bg-white">
-          <ul className="divide-y divide-slate-100">
+        <section className="overflow-hidden rounded-3xl border border-stone-200 bg-white shadow-sm">
+          <ul className="divide-y divide-stone-100">
             {cases.map((item) => {
-              const status = getStatusLabel(item.estado);
+              const flow = readTutelaFlow(item.llm_extraccion_json);
+              const progress = getProgress(item.estado, flow.veredicto_confirmado);
               return (
-                <li key={item.id} className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
-                  <div>
-                    <p className="font-medium text-slate-900">{item.radicado || "Sin radicado"}</p>
-                    <p className="mt-0.5 text-sm text-slate-600">
-                      {item.demandante_nombre} vs {item.demandado_nombre}
-                    </p>
-                    <span className={`mt-2 inline-block rounded-md border px-2 py-0.5 text-xs font-medium ${status.className}`}>
-                      {status.label}
-                    </span>
-                  </div>
+                <li key={item.id}>
                   <Link
                     href={`/tutelas/${item.id}`}
-                    className="rounded-lg border border-slate-300 px-4 py-2 text-center text-sm font-medium text-slate-700"
+                    className="flex flex-col gap-3 px-5 py-4 transition hover:bg-stone-50 sm:flex-row sm:items-center sm:justify-between sm:px-6"
                   >
-                    Continuar
+                    <div className="min-w-0">
+                      <p className="font-medium tracking-tight text-slate-900">{item.radicado || "Sin radicado"}</p>
+                      <p className="mt-1 truncate text-sm text-slate-500">
+                        {item.demandante_nombre} vs {item.demandado_nombre}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${progress.className}`}>
+                        {progress.label}
+                      </span>
+                      <span className="text-sm text-slate-400">{progress.hint} →</span>
+                    </div>
                   </Link>
                 </li>
               );
@@ -61,14 +70,6 @@ export default async function TutelasPage() {
           </ul>
         </section>
       )}
-
-      <p className="text-xs text-slate-500">
-        Antes de analizar tutelas, carga las normas de referencia en{" "}
-        <Link href="/biblioteca" className="underline">
-          Biblioteca
-        </Link>
-        .
-      </p>
     </AppShell>
   );
 }

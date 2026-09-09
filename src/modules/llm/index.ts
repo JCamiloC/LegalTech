@@ -6,3 +6,6 @@ export * from "./extraction.service";
 export * from "./decision-prompt";
 export * from "./decision.service";
 export * from "./types";
+export * from "./tutela-flow";
+export * from "./tutela-chat.service";
+export * from "./tutela-draft.service";

@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { loginAction } from "./actions";
 import FeedbackToast from "@/components/FeedbackToast";
 
@@ -14,51 +13,41 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
   const ok = Array.isArray(okParam) ? okParam[0] : okParam;
 
   return (
-    <main className="mx-auto flex min-h-screen w-full max-w-md flex-col justify-center px-6 py-10">
+    <main className="flex min-h-screen items-center justify-center bg-[#f6f4ef] px-6 py-12">
       <FeedbackToast message={error} tone="error" />
       <FeedbackToast message={ok} tone="success" />
-      <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-        <h1 className="text-2xl font-semibold text-slate-900">Asistente de tutelas</h1>
-        <p className="mt-2 text-sm text-slate-600">
-          Apoyo para analizar tutelas, fundamentar decisiones y generar borradores de respuesta.
+      <div className="w-full max-w-md rounded-3xl border border-stone-200 bg-white p-8 shadow-sm">
+        <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-900 text-sm font-semibold text-white">
+          T
+        </span>
+        <h1 className="mt-5 text-2xl font-semibold tracking-tight">Asistente de tutelas</h1>
+        <p className="mt-2 text-sm leading-6 text-slate-600">
+          Carga el expediente, decide con apoyo y baja el borrador en el formato del despacho.
         </p>
-
-        <form action={loginAction} className="mt-6 space-y-4">
-          <label className="block text-sm text-slate-700">
+        <form action={loginAction} className="mt-8 space-y-4">
+          <label className="block text-sm font-medium text-slate-700">
             Correo
             <input
               name="email"
               type="email"
               required
-              className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
-              placeholder="usuario@dominio.com"
+              className="mt-1 w-full rounded-2xl border border-stone-300 px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-slate-900/10"
+              placeholder="abogado@despacho.gov.co"
             />
           </label>
-
-          <label className="block text-sm text-slate-700">
+          <label className="block text-sm font-medium text-slate-700">
             Contraseña
             <input
               name="password"
               type="password"
               required
-              className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+              className="mt-1 w-full rounded-2xl border border-stone-300 px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-slate-900/10"
             />
           </label>
-
-          <button
-            type="submit"
-            className="w-full rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white"
-          >
-            Ingresar
+          <button type="submit" className="theme-btn-primary w-full">
+            Entrar
           </button>
         </form>
-
-        <p className="mt-6 text-xs text-slate-500">
-          ¿No tienes cuenta? <Link href="/registro" className="underline">Regístrate</Link>
-        </p>
-        <p className="mt-2 text-xs text-slate-500">
-          ¿Volver al inicio? <Link href="/" className="underline">Inicio</Link>
-        </p>
       </div>
     </main>
   );

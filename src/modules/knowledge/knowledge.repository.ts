@@ -239,6 +239,17 @@ export class KnowledgeRepository {
     return data as KnowledgeDocumentRecord;
   }
 
+  async listActiveDocuments(limit = 24): Promise<KnowledgeDocumentRecord[]> {
+    const { data } = await this.supabase
+      .from("knowledge_documents")
+      .select("*")
+      .eq("activo", true)
+      .order("updated_at", { ascending: false })
+      .limit(limit);
+
+    return (data ?? []) as KnowledgeDocumentRecord[];
+  }
+
   async archiveDocument(documentId: string): Promise<boolean> {
     const { error } = await this.supabase
       .from("knowledge_documents")

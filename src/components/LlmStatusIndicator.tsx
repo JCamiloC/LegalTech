@@ -77,7 +77,7 @@ export default function LlmStatusIndicator() {
   const classes = useMemo(() => getBadgeClasses(status), [status]);
 
   return (
-    <div className={`fixed bottom-4 right-4 z-50 rounded-full border px-3 py-1.5 text-xs font-medium shadow-sm ${classes}`}>
+    <div className={`fixed bottom-4 right-4 z-50 rounded-full border border-stone-200 bg-white/90 px-3 py-1.5 text-[11px] font-medium text-slate-600 shadow-sm backdrop-blur ${classes}`}>
       <span>{getLabel(status)}</span>
       {provider ? <span className="ml-2 opacity-80">{provider}</span> : null}
       {model ? <span className="ml-1 opacity-70">{model}</span> : null}
